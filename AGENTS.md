@@ -1,0 +1,11 @@
+- This repository is exclusively for Band8.
+- Do not read from or modify unrelated project repositories unless explicitly authorized.
+- Local-first.
+- Protocol-first.
+- Raw evidence is immutable factual history.
+- AI/model inference must remain distinguishable from factual evidence.
+- Generated training packages are untrusted input.
+- No push or deployment without explicit authorization.
+- Do not introduce secrets into the repository.
+- Preserve a clean, reviewable Git history.
+- Stop on unexpected repository identity, existing user files, or destructive-operation risk.

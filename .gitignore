@@ -1,0 +1,35 @@
+# Environment secrets and local environment files
+.env
+.env.*
+!.env.example
+*.secret
+*.secrets
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+
+# Editor temporary files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS temporary files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Build, dependency, and cache directories
+build/
+dist/
+coverage/
+node_modules/
+.cache/
+.tmp/
+tmp/
+temp/
+__pycache__/
+*.py[cod]
