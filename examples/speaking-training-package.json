@@ -1,0 +1,21 @@
+{
+  "schema_version": "0.1.0", "protocol_version": "0.1.0", "package_id": "pkg-speaking-fluency-001", "created_at": "2026-08-26T02:00:00Z",
+  "generator": {"producer": "Codex", "producer_version": "gpt-5"},
+  "contract_versions": {"pedagogy_version": "0.1.0", "coach_contract_version": "0.1.0", "skill_taxonomy_version": "0.1.0"},
+  "learner_goal": {"overall_target": 8.0, "section_minimums": {"listening": 7.5, "reading": 7.5, "writing": 7.5, "speaking": 7.5}},
+  "session_intent": {"mode": "training", "objective": "Produce and reflect on a two-minute unfamiliar-topic response.", "evidence_class": "training_performance"},
+  "estimated_duration_minutes": 10,
+  "training_rationale": {"summary": "A bounded recording creates observable fluency evidence before explanation.", "evidence_refs": []},
+  "target_skills": ["speaking.fluency-coherence"], "training_hypotheses": [],
+  "resources": [{"resource_id": "res-cue-card", "resource_type": "text", "content_format": "plain_text", "content": "Describe a public place that changed how you think about your city. Explain what changed and why."}],
+  "phases": [{"phase_id": "phase-production", "kind": "generation", "activity_ids": ["act-directions", "act-record", "act-rating"]}],
+  "activities": [
+    {"activity_id": "act-directions", "type": "INSTRUCTION", "phase_id": "phase-production", "skill_refs": ["speaking.fluency-coherence"], "prompt": "Prepare for one minute, then speak without reading a script.", "resource_refs": ["res-cue-card"], "config": {"acknowledge_required": true}, "completion": {"required": true, "submit_required": true}, "feedback": {"timing": "none", "allowed": []}, "timeout": {"limit_seconds": 60, "on_timeout": "record_incomplete"}, "accessibility": {"keyboard_operable": true, "screen_reader_label": "Speaking directions"}, "evidence_requirements": ["activity_completed"]},
+    {"activity_id": "act-record", "type": "SPEAK_RECORD", "phase_id": "phase-production", "skill_refs": ["speaking.fluency-coherence"], "prompt": "Record your response.", "resource_refs": ["res-cue-card"], "config": {"min_seconds": 60, "max_seconds": 150, "max_takes": 2, "artifact_type": "speaking_audio"}, "completion": {"required": true, "submit_required": true}, "feedback": {"timing": "after_activity", "allowed": ["rubric", "retry_invitation"]}, "timeout": {"limit_seconds": 240, "on_timeout": "record_incomplete"}, "accessibility": {"keyboard_operable": true, "screen_reader_label": "Speaking recorder"}, "evidence_requirements": ["speaking_recording_created", "artifact_created"]},
+    {"activity_id": "act-rating", "type": "SELF_ASSESS", "phase_id": "phase-production", "skill_refs": ["speaking.fluency-coherence"], "prompt": "Rate how well your ideas stayed connected.", "resource_refs": [], "config": {"scale_min": 1, "scale_max": 5, "labels": ["fragmented", "partly connected", "mostly connected", "clear", "sustained"]}, "completion": {"required": true, "submit_required": true}, "feedback": {"timing": "after_submission", "allowed": ["comparison"]}, "timeout": {"limit_seconds": 60, "on_timeout": "record_incomplete"}, "accessibility": {"keyboard_operable": true, "screen_reader_label": "Coherence self rating"}, "evidence_requirements": ["self_rating_submitted"]}
+  ],
+  "feedback_policy": {"mode": "training", "allow_hints": false, "allow_retry": true, "correction_timing": "after_activity"},
+  "completion_policy": {"required_activity_ids": ["act-directions", "act-record", "act-rating"], "allow_partial_result": true},
+  "reinforcement_hints": {"candidate_types": []},
+  "evidence_requirements": {"required_event_types": ["session_started", "activity_started", "speaking_recording_created", "artifact_created", "self_rating_submitted", "activity_completed", "session_completed"], "artifact_types": ["speaking_audio"]}
+}

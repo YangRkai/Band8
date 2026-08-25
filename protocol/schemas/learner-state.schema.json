@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://band8.local/protocol/0.1/learner-state.schema.json",
+  "title": "Band8 Learner State 0.1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "protocol_version", "learner_id", "updated_at", "goal", "official_results", "practice_results", "ai_estimates", "coach_inferences", "skill_evidence"],
+  "properties": {
+    "schema_version": {"const": "0.1.0"}, "protocol_version": {"const": "0.1.0"},
+    "learner_id": {"$ref": "#/$defs/id"}, "updated_at": {"type": "string", "format": "date-time"},
+    "goal": {"type": "object", "additionalProperties": false, "required": ["overall_target", "section_minimums"], "properties": {"overall_target": {"type": "number", "minimum": 0, "maximum": 9}, "section_minimums": {"type": "object", "additionalProperties": false, "required": ["listening", "reading", "writing", "speaking"], "properties": {"listening": {"type": "number", "minimum": 0, "maximum": 9}, "reading": {"type": "number", "minimum": 0, "maximum": 9}, "writing": {"type": "number", "minimum": 0, "maximum": 9}, "speaking": {"type": "number", "minimum": 0, "maximum": 9}}}}},
+    "official_results": {"$ref": "#/$defs/records"}, "practice_results": {"$ref": "#/$defs/records"}, "ai_estimates": {"$ref": "#/$defs/records"}, "coach_inferences": {"$ref": "#/$defs/records"},
+    "skill_evidence": {"type": "array", "maxItems": 256, "items": {"type": "object", "additionalProperties": false, "required": ["skill_id", "state", "evidence_refs"], "properties": {"skill_id": {"type": "string", "minLength": 3, "maxLength": 128}, "state": {"enum": ["unobserved", "emerging", "unstable", "provisionally_stable"]}, "evidence_refs": {"type": "array", "maxItems": 64, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}}}}
+  },
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$"}, "records": {"type": "array", "maxItems": 128, "items": {"type": "object", "maxProperties": 16}}}
+}

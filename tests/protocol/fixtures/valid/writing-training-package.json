@@ -1,0 +1,17 @@
+{
+  "schema_version": "0.1.0", "protocol_version": "0.1.0", "package_id": "pkg-writing-revision-001", "created_at": "2026-08-26T03:00:00Z",
+  "generator": {"producer": "Codex", "producer_version": "gpt-5"}, "contract_versions": {"pedagogy_version": "0.1.0", "coach_contract_version": "0.1.0", "skill_taxonomy_version": "0.1.0"},
+  "learner_goal": {"overall_target": 8.0, "section_minimums": {"listening": 7.5, "reading": 7.5, "writing": 7.5, "speaking": 7.5}},
+  "session_intent": {"mode": "training", "objective": "Draft and revise a focused task-response paragraph.", "evidence_class": "training_performance"}, "estimated_duration_minutes": 20,
+  "training_rationale": {"summary": "Generation followed by revision exposes task-response correction evidence.", "evidence_refs": []},
+  "target_skills": ["writing.task-response", "writing.coherence"], "training_hypotheses": [],
+  "resources": [{"resource_id": "res-writing-task", "resource_type": "text", "content_format": "plain_text", "content": "Some cities restrict private cars in central areas. Explain one benefit and one limitation of this policy."}],
+  "phases": [{"phase_id": "phase-draft", "kind": "generation", "activity_ids": ["act-draft"]}, {"phase_id": "phase-revise", "kind": "correction", "activity_ids": ["act-revise"]}],
+  "activities": [
+    {"activity_id": "act-draft", "type": "TEXT_RESPONSE", "phase_id": "phase-draft", "skill_refs": ["writing.task-response", "writing.coherence"], "prompt": "Write one paragraph that addresses both requested parts.", "resource_refs": ["res-writing-task"], "config": {"response_kind": "long", "min_characters": 300, "max_characters": 1800, "artifact_type": "essay"}, "completion": {"required": true, "submit_required": true}, "feedback": {"timing": "after_activity", "allowed": ["rubric", "comparison"]}, "timeout": {"limit_seconds": 900, "on_timeout": "submit_current"}, "accessibility": {"keyboard_operable": true, "screen_reader_label": "Writing response editor"}, "evidence_requirements": ["answer_submitted", "artifact_created"]},
+    {"activity_id": "act-revise", "type": "COMPARE_REVISE", "phase_id": "phase-revise", "skill_refs": ["writing.task-response", "writing.coherence"], "prompt": "Revise the paragraph using the rubric comparison.", "resource_refs": [], "config": {"source_activity_id": "act-draft", "revision_kind": "rewrite", "artifact_type": "rewrite"}, "completion": {"required": true, "submit_required": true}, "feedback": {"timing": "after_submission", "allowed": ["rubric", "comparison"]}, "timeout": {"limit_seconds": 600, "on_timeout": "record_incomplete"}, "accessibility": {"keyboard_operable": true, "screen_reader_label": "Writing revision editor"}, "evidence_requirements": ["correction_started", "writing_revision_created", "correction_submitted"]}
+  ],
+  "feedback_policy": {"mode": "training", "allow_hints": false, "allow_retry": true, "correction_timing": "after_activity"},
+  "completion_policy": {"required_activity_ids": ["act-draft", "act-revise"], "allow_partial_result": true}, "reinforcement_hints": {"candidate_types": []},
+  "evidence_requirements": {"required_event_types": ["session_started", "answer_submitted", "artifact_created", "correction_submitted", "session_completed"], "artifact_types": ["essay", "rewrite"]}
+}

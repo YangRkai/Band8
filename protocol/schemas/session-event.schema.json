@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://band8.local/protocol/0.1/session-event.schema.json",
+  "title": "Band8 Session Event 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "protocol_version", "event_id", "event_type", "session_id", "package_id", "activity_id", "timestamp", "monotonic_offset_ms", "sequence_number", "payload"],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "protocol_version": {"const": "0.1.0"},
+    "event_id": {"$ref": "#/$defs/id"},
+    "event_type": {"enum": ["session_started", "session_paused", "session_resumed", "session_completed", "session_abandoned", "activity_started", "activity_completed", "answer_selected", "answer_changed", "answer_submitted", "audio_started", "audio_paused", "audio_replayed", "text_revisited", "evidence_selected", "evidence_changed", "hint_requested", "correction_started", "correction_submitted", "retry_started", "retry_completed", "self_rating_submitted", "writing_revision_created", "speaking_recording_created", "artifact_created", "reinforcement_awarded", "assessment_submitted", "record_invalidated", "record_migrated" ]},
+    "session_id": {"$ref": "#/$defs/id"},
+    "package_id": {"$ref": "#/$defs/id"},
+    "activity_id": {"type": ["string", "null"], "maxLength": 128},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "monotonic_offset_ms": {"type": "integer", "minimum": 0},
+    "sequence_number": {"type": "integer", "minimum": 1},
+    "payload": {"type": "object", "maxProperties": 24},
+    "supersedes": {"type": ["string", "null"], "maxLength": 128},
+    "invalidates": {"type": ["string", "null"], "maxLength": 128},
+    "migration_version": {"type": ["string", "null"], "maxLength": 40}
+  },
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$"}}
+}

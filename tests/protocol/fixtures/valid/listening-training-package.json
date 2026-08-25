@@ -1,0 +1,15 @@
+{
+  "schema_version":"0.1.0","protocol_version":"0.1.0","package_id":"pkg-listening-detail-001","created_at":"2026-08-26T05:00:00Z",
+  "generator":{"producer":"Codex","producer_version":"gpt-5"},"contract_versions":{"pedagogy_version":"0.1.0","coach_contract_version":"0.1.0","skill_taxonomy_version":"0.1.0"},
+  "learner_goal":{"overall_target":8.0,"section_minimums":{"listening":7.5,"reading":7.5,"writing":7.5,"speaking":7.5}},
+  "session_intent":{"mode":"training","objective":"Retrieve one explicit detail from bounded audio.","evidence_class":"training_performance"},"estimated_duration_minutes":6,
+  "training_rationale":{"summary":"A limited-replay audio item provides listening detail and replay evidence.","evidence_refs":[]},"target_skills":["listening.detail"],"training_hypotheses":[],
+  "resources":[{"resource_id":"res-audio-script","resource_type":"audio_script","content_format":"plain_text","content":"The museum tour begins at ten fifteen beside the east entrance."}],
+  "phases":[{"phase_id":"phase-listen","kind":"retrieval","activity_ids":["act-audio","act-answer"]}],
+  "activities":[
+    {"activity_id":"act-audio","type":"PLAY_AUDIO","phase_id":"phase-listen","skill_refs":["listening.detail"],"prompt":"Listen for the start time and meeting place.","resource_refs":["res-audio-script"],"config":{"max_plays":2,"allow_seek":false},"completion":{"required":true,"submit_required":false},"feedback":{"timing":"none","allowed":[]},"timeout":{"limit_seconds":120,"on_timeout":"record_incomplete"},"accessibility":{"keyboard_operable":true,"screen_reader_label":"Listening audio control","transcript_resource_ref":"res-audio-script"},"evidence_requirements":["audio_started","audio_replayed","activity_completed"]},
+    {"activity_id":"act-answer","type":"TEXT_RESPONSE","phase_id":"phase-listen","skill_refs":["listening.detail"],"prompt":"State the time and meeting place.","resource_refs":[],"config":{"response_kind":"short","min_characters":4,"max_characters":120},"completion":{"required":true,"submit_required":true},"feedback":{"timing":"after_submission","allowed":["correctness","explanation"]},"timeout":{"limit_seconds":90,"on_timeout":"submit_current"},"accessibility":{"keyboard_operable":true,"screen_reader_label":"Listening answer"},"evidence_requirements":["answer_submitted"]}
+  ],
+  "feedback_policy":{"mode":"training","allow_hints":false,"allow_retry":true,"correction_timing":"after_submission"},"completion_policy":{"required_activity_ids":["act-audio","act-answer"],"allow_partial_result":true},"reinforcement_hints":{"candidate_types":[]},
+  "evidence_requirements":{"required_event_types":["session_started","audio_started","answer_submitted","session_completed"],"artifact_types":[]}
+}

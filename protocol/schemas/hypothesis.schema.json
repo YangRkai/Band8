@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://band8.local/protocol/0.1/hypothesis.schema.json",
+  "title": "Band8 Coach Hypothesis 0.1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "protocol_version", "hypothesis_id", "claim", "skill_refs", "confidence", "supporting_evidence", "contradicting_evidence", "created_at", "last_updated_at", "status", "next_test", "producer", "producer_version"],
+  "properties": {
+    "schema_version": {"const": "0.1.0"}, "protocol_version": {"const": "0.1.0"},
+    "hypothesis_id": {"$ref": "#/$defs/id"}, "claim": {"type": "string", "minLength": 1, "maxLength": 1000},
+    "skill_refs": {"type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": {"type": "string", "minLength": 3, "maxLength": 128}},
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    "supporting_evidence": {"$ref": "#/$defs/ids"}, "contradicting_evidence": {"$ref": "#/$defs/ids"},
+    "created_at": {"type": "string", "format": "date-time"}, "last_updated_at": {"type": "string", "format": "date-time"},
+    "status": {"enum": ["active", "weakened", "rejected", "provisionally_supported"]},
+    "next_test": {"type": "string", "minLength": 1, "maxLength": 1000},
+    "producer": {"type": "string", "minLength": 1, "maxLength": 80}, "producer_version": {"type": "string", "minLength": 1, "maxLength": 80}
+  },
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$"}, "ids": {"type": "array", "maxItems": 128, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}}
+}

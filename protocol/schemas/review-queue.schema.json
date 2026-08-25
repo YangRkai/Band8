@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://band8.local/protocol/0.1/review-queue.schema.json",
+  "title": "Band8 Review Queue 0.1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "protocol_version", "learner_id", "updated_at", "items"],
+  "properties": {
+    "schema_version": {"const": "0.1.0"}, "protocol_version": {"const": "0.1.0"},
+    "learner_id": {"$ref": "#/$defs/id"}, "updated_at": {"type": "string", "format": "date-time"},
+    "items": {"type": "array", "maxItems": 512, "items": {"type": "object", "additionalProperties": false, "required": ["review_id", "skill_ref", "due_at", "reason", "status", "evidence_refs", "constraints", "completion_evidence_refs"], "properties": {"review_id": {"$ref": "#/$defs/id"}, "skill_ref": {"type": "string", "minLength": 3, "maxLength": 128}, "due_at": {"type": "string", "format": "date-time"}, "reason": {"enum": ["spacing", "delayed_retention", "transfer_recheck", "assessment_recheck"]}, "status": {"enum": ["scheduled", "due", "completed", "cancelled"]}, "evidence_refs": {"$ref": "#/$defs/ids"}, "constraints": {"type": "object", "additionalProperties": false, "required": ["not_before", "required_evidence_class"], "properties": {"not_before": {"type": "string", "format": "date-time"}, "required_evidence_class": {"enum": ["training_performance", "transfer_performance", "assessment_performance"]}}}, "completion_evidence_refs": {"$ref": "#/$defs/ids"}}}}
+  },
+  "$defs": {"id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$"}, "ids": {"type": "array", "maxItems": 128, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}}
+}

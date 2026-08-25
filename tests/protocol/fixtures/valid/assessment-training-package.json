@@ -1,0 +1,12 @@
+{
+  "schema_version":"0.1.0","protocol_version":"0.1.0","package_id":"pkg-assessment-boss-001","created_at":"2026-08-26T06:00:00Z",
+  "generator":{"producer":"Codex","producer_version":"gpt-5"},"contract_versions":{"pedagogy_version":"0.1.0","coach_contract_version":"0.1.0","skill_taxonomy_version":"0.1.0"},
+  "learner_goal":{"overall_target":8.0,"section_minimums":{"listening":7.5,"reading":7.5,"writing":7.5,"speaking":7.5}},
+  "session_intent":{"mode":"assessment","objective":"Measure TFNG transfer without in-performance assistance.","evidence_class":"assessment_performance"},"estimated_duration_minutes":8,
+  "training_rationale":{"summary":"A closed assessment preserves independent performance evidence.","evidence_refs":[]},"target_skills":["reading.tfng.semantic-relation"],"training_hypotheses":[],
+  "resources":[{"resource_id":"res-assessment-passage","resource_type":"text","content_format":"plain_text","content":"The report lists two proposed routes but does not state which route residents prefer."}],
+  "phases":[{"phase_id":"phase-assessment","kind":"assessment","activity_ids":["act-assessment"]}],
+  "activities":[{"activity_id":"act-assessment","type":"SELECT","phase_id":"phase-assessment","skill_refs":["reading.tfng.semantic-relation"],"prompt":"Claim: Residents prefer the second route.","resource_refs":["res-assessment-passage"],"config":{"selection_mode":"one","options":[{"option_id":"true","label":"True"},{"option_id":"false","label":"False"},{"option_id":"not-given","label":"Not Given"}],"min_selections":1,"max_selections":1},"completion":{"required":true,"submit_required":true},"feedback":{"timing":"after_session","allowed":["correctness","explanation"]},"timeout":{"limit_seconds":180,"on_timeout":"submit_current"},"accessibility":{"keyboard_operable":true,"screen_reader_label":"Assessment choices"},"evidence_requirements":["answer_submitted","assessment_submitted"]}],
+  "feedback_policy":{"mode":"assessment","allow_hints":false,"allow_retry":false,"correction_timing":"after_session"},"completion_policy":{"required_activity_ids":["act-assessment"],"allow_partial_result":true},"reinforcement_hints":{"candidate_types":["boss_fight_candidate"]},
+  "evidence_requirements":{"required_event_types":["session_started","answer_submitted","assessment_submitted","session_completed"],"artifact_types":[]}
+}
