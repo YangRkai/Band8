@@ -1,0 +1,32 @@
+{
+  "schema_version": "0.1.0",
+  "protocol_version": "0.1.0",
+  "evaluation_id": "evaluation-runtime-reading-001",
+  "package_id": "pkg-runtime-reading-001",
+  "package_hash": "sha256:71b9e864efbc3ad735f671fae258ff05fec4de8368475b2cb44226523fdc096d",
+  "content_hash": "sha256:39edbd06e20bca3fd78e8c8402984a8f8c56cb54d302fdd2113a81d64af363a2",
+  "entries": [
+    {
+      "activity_id": "activity-runtime-select-1",
+      "scoring_rule": "exact_option_set",
+      "correct_option_ids": [
+        "true"
+      ],
+      "accepted_texts": [],
+      "expected_order": [],
+      "expected_pairs": [],
+      "integrity_ref": "sha256:31316bbc03b377778dda1ccf505d5c243a040096a77d565c881a0176b808766e"
+    },
+    {
+      "activity_id": "activity-runtime-select-2",
+      "scoring_rule": "exact_option_set",
+      "correct_option_ids": [
+        "not-given"
+      ],
+      "accepted_texts": [],
+      "expected_order": [],
+      "expected_pairs": [],
+      "integrity_ref": "sha256:9437d7d595b67915b77ea4e4017aa54044522ed5a7343217ea272fc86eedb572"
+    }
+  ]
+}

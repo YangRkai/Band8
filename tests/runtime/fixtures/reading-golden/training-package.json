@@ -1,0 +1,335 @@
+{
+  "schema_version": "0.1.0",
+  "protocol_version": "0.1.0",
+  "package_id": "pkg-runtime-reading-001",
+  "created_at": "2026-08-26T14:00:00Z",
+  "generator": {
+    "producer": "band8-synthetic-fixture",
+    "producer_version": "0.1.0"
+  },
+  "contract_versions": {
+    "b8tp_version": "0.1.0",
+    "package_schema_version": "0.1.0",
+    "evidence_contract_version": "0.1.0",
+    "reinforcement_contract_version": "0.1.0",
+    "pedagogy_version": "0.1.0",
+    "coach_contract_version": "0.1.0",
+    "skill_taxonomy_version": "0.1.0",
+    "runtime_version": "0.1.0",
+    "validator_version": "0.1.0"
+  },
+  "learner_goal": {
+    "overall_target": 8,
+    "section_minimums": {
+      "listening": 7.5,
+      "reading": 7.5,
+      "writing": 7.5,
+      "speaking": 7.5
+    }
+  },
+  "session_intent": {
+    "mode": "training",
+    "objective": "Distinguish stated facts from unsupported claims in a synthetic reading passage.",
+    "evidence_class": "training_performance"
+  },
+  "estimated_duration_minutes": 5,
+  "training_rationale": {
+    "summary": "A generated, source-safe vertical slice for deterministic Runtime execution.",
+    "evidence_refs": []
+  },
+  "target_skills": [
+    "reading.explicit-detail",
+    "reading.not-given"
+  ],
+  "training_hypotheses": [],
+  "resources": [
+    {
+      "resource_id": "resource-runtime-passage",
+      "resource_type": "text",
+      "content_format": "plain_text",
+      "content": "At Brookfield Library, a trial replaced printed reminder slips with optional email notices. Borrowers could still request paper notices at the desk. After three months, late returns fell, but the library did not measure whether email users read more books.",
+      "provenance": {
+        "origin_type": "generated",
+        "source_identifier": null,
+        "generator": {
+          "producer": "band8-synthetic-fixture",
+          "producer_version": "0.1.0"
+        },
+        "content_hash": "sha256:ee65cb45134eff3c6e4d7e803d143ebb1c18107d86cbe051c7446c3365ccc559",
+        "license": null,
+        "attribution": null,
+        "redistribution_status": "cleared"
+      }
+    }
+  ],
+  "phases": [
+    {
+      "phase_id": "phase-runtime-reading",
+      "kind": "practice",
+      "activity_ids": [
+        "activity-runtime-instruction",
+        "activity-runtime-passage",
+        "activity-runtime-select-1",
+        "activity-runtime-select-2"
+      ]
+    }
+  ],
+  "activities": [
+    {
+      "activity_id": "activity-runtime-instruction",
+      "type": "INSTRUCTION",
+      "phase_id": "phase-runtime-reading",
+      "skill_refs": [
+        "reading.explicit-detail"
+      ],
+      "prompt": "Read the passage, then answer both statements using only stated information.",
+      "resource_refs": [],
+      "config": {
+        "acknowledge_required": true
+      },
+      "completion": {
+        "required": true,
+        "submit_required": false
+      },
+      "feedback": {
+        "timing": "none",
+        "allowed": []
+      },
+      "timeout": {
+        "limit_seconds": 120,
+        "on_timeout": "record_incomplete"
+      },
+      "accessibility": {
+        "keyboard_operable": true,
+        "screen_reader_label": "False or Not Given selection"
+      },
+      "evidence_requirements": [
+        "activity_started",
+        "activity_completed"
+      ],
+      "attempt_id": "attempt-runtime-instruction",
+      "pedagogical_intent": "retrieval",
+      "output_contract": {
+        "kind": "none",
+        "artifact_type": null
+      },
+      "relationships": {
+        "revision_of": null,
+        "feedback_ref": null,
+        "source_output_ref": null,
+        "prior_evidence_refs": []
+      }
+    },
+    {
+      "activity_id": "activity-runtime-passage",
+      "type": "PRESENT_TEXT",
+      "phase_id": "phase-runtime-reading",
+      "skill_refs": [
+        "reading.explicit-detail"
+      ],
+      "prompt": "Read the synthetic library passage.",
+      "resource_refs": [
+        "resource-runtime-passage"
+      ],
+      "config": {
+        "display_mode": "continuous"
+      },
+      "completion": {
+        "required": true,
+        "submit_required": false
+      },
+      "feedback": {
+        "timing": "none",
+        "allowed": []
+      },
+      "timeout": {
+        "limit_seconds": 120,
+        "on_timeout": "record_incomplete"
+      },
+      "accessibility": {
+        "keyboard_operable": true,
+        "screen_reader_label": "False or Not Given selection"
+      },
+      "evidence_requirements": [
+        "activity_started",
+        "activity_completed"
+      ],
+      "attempt_id": "attempt-runtime-passage",
+      "pedagogical_intent": "retrieval",
+      "output_contract": {
+        "kind": "none",
+        "artifact_type": null
+      },
+      "relationships": {
+        "revision_of": null,
+        "feedback_ref": null,
+        "source_output_ref": null,
+        "prior_evidence_refs": []
+      }
+    },
+    {
+      "activity_id": "activity-runtime-select-1",
+      "type": "SELECT",
+      "phase_id": "phase-runtime-reading",
+      "skill_refs": [
+        "reading.explicit-detail"
+      ],
+      "prompt": "Late returns fell during the email-notice trial.",
+      "resource_refs": [
+        "resource-runtime-passage"
+      ],
+      "config": {
+        "selection_mode": "one",
+        "options": [
+          {
+            "option_id": "true",
+            "label": "True"
+          },
+          {
+            "option_id": "false",
+            "label": "False"
+          },
+          {
+            "option_id": "not-given",
+            "label": "Not Given"
+          }
+        ],
+        "min_selections": 1,
+        "max_selections": 1
+      },
+      "completion": {
+        "required": true,
+        "submit_required": true
+      },
+      "feedback": {
+        "timing": "none",
+        "allowed": []
+      },
+      "timeout": {
+        "limit_seconds": 120,
+        "on_timeout": "record_incomplete"
+      },
+      "accessibility": {
+        "keyboard_operable": true,
+        "screen_reader_label": "False or Not Given selection"
+      },
+      "evidence_requirements": [
+        "activity_started",
+        "answer_selected",
+        "answer_submitted",
+        "activity_completed"
+      ],
+      "attempt_id": "attempt-runtime-select-1",
+      "pedagogical_intent": "retrieval",
+      "output_contract": {
+        "kind": "selection",
+        "artifact_type": null
+      },
+      "relationships": {
+        "revision_of": null,
+        "feedback_ref": null,
+        "source_output_ref": null,
+        "prior_evidence_refs": []
+      }
+    },
+    {
+      "activity_id": "activity-runtime-select-2",
+      "type": "SELECT",
+      "phase_id": "phase-runtime-reading",
+      "skill_refs": [
+        "reading.explicit-detail"
+      ],
+      "prompt": "Email notices caused borrowers to read more books.",
+      "resource_refs": [
+        "resource-runtime-passage"
+      ],
+      "config": {
+        "selection_mode": "one",
+        "options": [
+          {
+            "option_id": "true",
+            "label": "True"
+          },
+          {
+            "option_id": "false",
+            "label": "False"
+          },
+          {
+            "option_id": "not-given",
+            "label": "Not Given"
+          }
+        ],
+        "min_selections": 1,
+        "max_selections": 1
+      },
+      "completion": {
+        "required": true,
+        "submit_required": true
+      },
+      "feedback": {
+        "timing": "none",
+        "allowed": []
+      },
+      "timeout": {
+        "limit_seconds": 120,
+        "on_timeout": "record_incomplete"
+      },
+      "accessibility": {
+        "keyboard_operable": true,
+        "screen_reader_label": "False or Not Given selection"
+      },
+      "evidence_requirements": [
+        "activity_started",
+        "answer_selected",
+        "answer_submitted",
+        "activity_completed"
+      ],
+      "attempt_id": "attempt-runtime-select-2",
+      "pedagogical_intent": "retrieval",
+      "output_contract": {
+        "kind": "selection",
+        "artifact_type": null
+      },
+      "relationships": {
+        "revision_of": null,
+        "feedback_ref": null,
+        "source_output_ref": null,
+        "prior_evidence_refs": []
+      }
+    }
+  ],
+  "feedback_policy": {
+    "mode": "training",
+    "allow_hints": false,
+    "allow_retry": false,
+    "correction_timing": "none"
+  },
+  "completion_policy": {
+    "required_activity_ids": [
+      "activity-runtime-instruction",
+      "activity-runtime-passage",
+      "activity-runtime-select-1",
+      "activity-runtime-select-2"
+    ],
+    "allow_partial_result": false,
+    "coach_checkpoint": null
+  },
+  "evidence_requirements": {
+    "required_event_types": [
+      "session_started",
+      "activity_started",
+      "activity_completed",
+      "answer_selected",
+      "answer_submitted",
+      "session_completed"
+    ],
+    "artifact_types": []
+  },
+  "run_id": "run-runtime-reading-001",
+  "segment_id": "segment-runtime-reading-001",
+  "protected_evaluation_ref": {
+    "evaluation_id": "evaluation-runtime-reading-001",
+    "content_hash": "sha256:39edbd06e20bca3fd78e8c8402984a8f8c56cb54d302fdd2113a81d64af363a2"
+  },
+  "continuation": null
+}
