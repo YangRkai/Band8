@@ -2,74 +2,68 @@
 
 ## Purpose
 
-B8TP is the only training-package dependency between an External Coach and Band8 Runtime. The Coach emits JSON; Band8 validates and executes only schema-conformant primitives. Natural-language instructions never acquire runtime authority.
+B8TP is the only training-package dependency between an External Coach and Band8 Runtime. The Coach emits declarative JSON; Band8 validates and executes only schema-conformant primitives. Natural-language content never acquires runtime or Coach instruction authority.
 
 ## Package envelope
 
-Every package contains:
+Every package records exact schema/protocol versions, immutable `package_id`, `run_id`, `segment_id`, creation time, generator and full contract versions, learner goal, intent, rationale, resources, phases, activities, feedback/completion policy, protected-evaluation reference, continuation binding, and evidence requirements. Unknown top-level fields are rejected.
 
-- `schema_version` and `protocol_version`, both `0.1.0`.
-- globally stable `package_id` and RFC 3339 `created_at`.
-- `generator` provenance and `contract_versions`.
-- IELTS `learner_goal`, `session_intent`, and bounded duration.
-- traceable `training_rationale`, target skills, tested hypotheses, and available evidence references.
-- package-local resources, ordered phases, and activities.
-- fixed feedback, completion, reinforcement-hint, and evidence policies.
+A `session` is the learner-facing study encounter. A `run` is the causal training loop and may span Coach continuations. A `segment` is one immutable package execution within a run. A `package` is the declarative input executed by exactly one segment.
 
-The schema rejects unknown top-level fields. Package IDs are immutable and collision-intolerant. Runtime stores the accepted package with its session.
+## V0.1 executable primitives
 
-## V0.1 training primitives
-
-| Primitive | Role | Required result | Characteristic events |
+| Primitive | Typed input | Typed output | Completion and events |
 | --- | --- | --- | --- |
-| `INSTRUCTION` | Present directions without collecting assessed content | acknowledgement when required | activity start/complete |
-| `PRESENT_TEXT` | Present a reading passage, prompt, rubric excerpt, or comparison text | visitation facts | text revisited, activity complete |
-| `PLAY_AUDIO` | Play a package-local audio script through runtime-controlled media | play count and position facts | audio start/pause/replay |
-| `SELECT` | One or multiple choice from bounded options | selected option IDs and revisions | answer selected/changed/submitted |
-| `MATCH` | Map bounded left items to right items | submitted pairs | answer changed/submitted |
-| `ORDER` | Arrange bounded items | submitted item order | answer changed/submitted |
-| `TEXT_RESPONSE` | Short answer, long answer, explanation, recall, or essay | text artifact or submitted value | answer submitted, writing revision created |
-| `EVIDENCE_SELECT` | Select and optionally annotate bounded spans in a resource | immutable original spans plus submitted revision | evidence selected/changed |
-| `SPEAK_RECORD` | Capture a bounded speaking attempt | audio artifact and optional transcript artifact | speaking recording created |
-| `COMPARE_REVISE` | Compare an earlier answer with feedback and submit a correction | revision artifact linked to source attempt | correction started/submitted, retry events |
-| `RETRIEVAL_PROMPT` | Test delayed retrieval with text, selection, or speech response | retrieval result with prior-evidence link | answer or recording events |
-| `SELF_ASSESS` | Collect confidence or perceived difficulty without changing mastery | self-rating fact | self rating submitted |
+| `INSTRUCTION` | prompt/resources and acknowledgement flag | none | configured acknowledgement; lifecycle events |
+| `PRESENT_TEXT` | text resource and display mode | none | bounded visitation; revisit/lifecycle events |
+| `PLAY_AUDIO` | audio-script resource, play/seek limits | none | bounded playback; audio/lifecycle events |
+| `SELECT` | closed options and cardinality | option IDs | select/change/submit events |
+| `MATCH` | closed left/right item sets | ID pairs | change/submit events |
+| `ORDER` | closed item set | ordered IDs | change/submit events |
+| `TEXT_RESPONSE` | response kind and character bounds | text or typed artifact | submit/artifact/revision events |
+| `EVIDENCE_SELECT` | resource, span bounds and preservation rule | typed span artifact | evidence/artifact events |
+| `SPEAK_RECORD` | duration/take bounds and audio artifact type | audio artifact | recording/artifact events |
+| `SELF_ASSESS` | integer scale and complete labels | self-rating fact | self-rating event only |
 
-`READ`, `LISTEN`, `WRITE`, and `RECORD` are modalities, not executable primitives. `SELECT_ONE` and `SELECT_MULTI` are one `SELECT` primitive with cardinality. Highlight and annotation are one `EVIDENCE_SELECT`. Rewrite, error correction, and repeated speaking are configurations of `COMPARE_REVISE`. Pause is a runtime session command, not package content.
+Reading, Listening, Writing, Speaking, retrieval, correction, retry, and transfer are modality or `pedagogical_intent`, not executable primitives. `RETRIEVAL_PROMPT` is removed: retrieval uses `SELECT`, `TEXT_RESPONSE`, or `SPEAK_RECORD` with prior evidence references. `COMPARE_REVISE` is removed: revision uses a response primitive with typed `attempt_id`, `revision_of`, `feedback_ref`, and `source_output_ref` relationships.
 
-## Common activity contract
+## Activity contract
 
-Each activity defines `activity_id`, primitive `type`, `phase_id`, `skill_refs`, prompt, resource references, primitive `config`, completion rule, feedback timing and allowed feedback, timeout behavior, accessibility metadata, and required evidence events.
+Every activity has one closed primitive config, explicit pedagogical intent, typed output contract, fixed completion predicate, emitted-event requirements, timeout behavior, feedback boundary, accessibility contract, and resolved reference semantics. The validator rejects mismatched output types, unresolved resources/evidence, self-revision, unsupported config fields, and invalid primitive-specific values.
 
-IDs are unique within their namespace. All references must resolve. A phase orders activity IDs; an activity belongs to exactly one phase. The validator rejects an activity whose configuration does not satisfy its primitive contract.
+Raw selections, recordings, drafts, corrections, and retries are never overwritten. Timeout records incomplete/current/abandoned facts according to policy and never fabricates completion.
 
-Every primitive inherits `completion.required`, `completion.submit_required`, `timeout.limit_seconds`, `timeout.on_timeout`, `accessibility.keyboard_operable`, `accessibility.screen_reader_label`, and an explicit feedback allowlist. The following matrix freezes primitive-specific input, interaction, result, event, feedback, and accessibility behavior:
+## Coach checkpoint and continuation
 
-| Type | Input and config | Interaction and completion | Result and events | Feedback and accessibility |
-| --- | --- | --- | --- | --- |
-| `INSTRUCTION` | Prompt plus package resources; `acknowledge_required` | Read, then acknowledge when required | acknowledgement fact; activity lifecycle | no correctness; keyboard acknowledgement and readable label |
-| `PRESENT_TEXT` | Text/rubric/comparison resource; `display_mode` continuous or paged | Read or revisit; completion follows configured acknowledgement-free viewing rule | visit/revisit counts; `text_revisited` and lifecycle | no answer feedback; structured reading order and screen-reader text |
-| `PLAY_AUDIO` | Audio-script resource; `max_plays` 1–5 and `allow_seek` | Runtime-controlled play/pause/replay within limit | play count, positions, effective listening time; audio events | no answer feedback; keyboard media controls and transcript resource reference |
-| `SELECT` | 2–20 ID/label options; one/multiple mode and cardinality | Select, change, and submit within bounds | immutable submitted option IDs plus revisions; answer events | correctness/explanation only at configured time; keyboard group labels |
-| `MATCH` | Bounded ID/label `left_items` and `right_items` | Create and revise mappings, then submit | submitted ID pairs and revision count; answer events | configured comparison/correctness; non-drag keyboard mapping available |
-| `ORDER` | Bounded ID/label `items` | Reorder and submit | ordered item IDs and revision count; answer events | configured comparison/correctness; keyboard move controls |
-| `TEXT_RESPONSE` | Response kind, character bounds, optional artifact type | Type, edit, and submit | submitted text or hashed text artifact; answer/artifact/revision events | rubric, explanation, or comparison after configured boundary; labelled editor |
-| `EVIDENCE_SELECT` | Text resource, span bounds, revision permission, raw-selection preservation | Select zero or more allowed spans, optionally annotate/revise, then submit | original and final offsets, annotations, resource ID; evidence events | comparison after submission; keyboard range selection and offset narration |
-| `SPEAK_RECORD` | Duration bounds, take limit, audio artifact type | Record, stop, review when allowed, and submit a take | audio artifact ID, duration, take number, optional transcript ID; recording/artifact events | rubric only after configured boundary; keyboard recorder with visual and nonvisual status |
-| `COMPARE_REVISE` | Existing activity ID, correction/rewrite/repeat mode, artifact type | Inspect fixed feedback, produce a new attempt, and submit | new artifact/answer linked to original without overwrite; correction/retry events | comparison and rubric after submission; original and revision separately navigable |
-| `RETRIEVAL_PROMPT` | Text/select/speech response mode and prior evidence references | Generate an answer before restudy | retrieval attempt linked to historical evidence; answer or recording events | explanation after submission; modality-appropriate accessible control |
-| `SELF_ASSESS` | Integer scale and complete label set | Choose and submit one rating | self-rating fact only; `self_rating_submitted` | comparison permitted, never mastery feedback; labelled radio/slider alternatives |
+Content-dependent Writing and Speaking feedback remains External Coach authority:
 
-Raw selections, recordings, drafts, and retries are never overwritten by later edits. Timeout always emits incomplete/current/abandoned facts according to `on_timeout`; it never fabricates completion.
+1. Package A executes and learner output becomes durable evidence.
+2. Its orchestration completion reaches the declared checkpoint.
+3. Runtime emits a hash-bound checkpoint manifest and enters `AWAITING_COACH`.
+4. Coach reads the required evidence as DATA ONLY and emits Package B.
+5. Package B keeps `run_id`, advances `segment_id`, and binds `continuation_of`, prior segment, checkpoint, and required evidence.
+6. Runtime validates Package B before execution; no continuation can rewrite prior evidence.
 
-## Feedback modes
+Writing can express draft → checkpoint → Coach feedback → rewrite → changed-material transfer. Speaking can express recording → checkpoint → Coach analysis → repeat → novel transfer. Checkpoint is orchestration/completion semantics, never a learner activity or executable primitive.
 
-Training mode may allow hints, post-submission correction, and retry according to fixed package policy. Assessment mode forbids hints, retry, dynamic difficulty reduction, correction before completion, explanations before submission, and reward presentation during performance. Analysis occurs after the assessment closes.
+## Feedback and protected evaluation
 
-## Resources and paths
+Training mode may allow fixed hints, correction, and retry at declared boundaries. Assessment mode forbids reveal, hints, retry, correction, adaptive easing, and reward display until the session closes.
 
-V0.1 resources are embedded `plain_text` or `markdown_subset` data. They cannot name external URLs or host files. Artifact metadata uses safe relative paths, but a training package cannot choose an arbitrary artifact destination.
+Correct answers, scoring keys, and protected rubric evaluation data are stored in a separately validated protected evaluation document. A package carries only its evaluation ID and integrity hash. Runtime may read the protected plane; Renderer and learner-visible activity data receive no protected payload projection before the allowed boundary. This is execution isolation, not DRM.
 
-## Validation
+## Resources and provenance
 
-Validation is deterministic: byte/depth/count limits, JSON Schema, reference integrity, primitive semantics, assessment constraints, dangerous-content checks, version compatibility, and package-ID collision policy. Any failure rejects the whole package; no best-effort execution exists.
+Resources are embedded `plain_text` or `markdown_subset` DATA ONLY with `generated`, `user_provided`, `licensed`, `public_domain`, or `unknown` provenance, source/generator metadata, SHA-256 content hash, license/attribution values, and redistribution status. Unknown content may remain local but cannot be asserted cleared or redistributable. Instruction-like strings remain legal learning data and are not filtered by keywords.
+
+Packages cannot define active UI, HTML execution, scripts, network calls, host paths, artifact destinations, tools, or reward behavior. Artifact metadata paths are normalized relative paths chosen under Runtime-owned roots.
+
+## Package identity
+
+The canonical package hash is SHA-256 over UTF-8 JSON serialized with sorted keys, no insignificant whitespace, and unescaped Unicode. Same `package_id` plus same hash is an idempotent no-op. Same ID plus a different hash is a collision and is rejected.
+
+## Validation claim
+
+Validation has two explicit layers. JSON Schema structural validation uses the supported JSON Schema subset required by committed schemas: local `$ref`, type, const, enum, required/properties, closed objects, array bounds/uniqueness, string bounds/pattern/date-time, and numeric bounds. Band8 semantic validation handles cross-document identity, references, state transitions, primitive contracts, hashes, protected evaluation, and fixed policy.
+
+Phase 0 does not claim a complete Draft 2020-12 implementation. Any structural or semantic failure rejects the whole import; no best-effort execution exists.

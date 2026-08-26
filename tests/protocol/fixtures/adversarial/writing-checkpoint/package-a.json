@@ -1,0 +1,161 @@
+{
+  "schema_version": "0.1.0",
+  "protocol_version": "0.1.0",
+  "package_id": "pkg-writing-checkpoint-a",
+  "created_at": "2026-08-26T00:00:00Z",
+  "generator": {
+    "producer": "Codex",
+    "producer_version": "gpt-5"
+  },
+  "contract_versions": {
+    "b8tp_version": "0.1.0",
+    "package_schema_version": "0.1.0",
+    "evidence_contract_version": "0.1.0",
+    "reinforcement_contract_version": "0.1.0",
+    "pedagogy_version": "0.1.0",
+    "coach_contract_version": "0.1.0",
+    "skill_taxonomy_version": "0.1.0",
+    "runtime_version": "0.1.0",
+    "validator_version": "0.1.0"
+  },
+  "learner_goal": {
+    "overall_target": 8.0,
+    "section_minimums": {
+      "listening": 7.5,
+      "reading": 7.5,
+      "writing": 7.5,
+      "speaking": 7.5
+    }
+  },
+  "session_intent": {
+    "mode": "training",
+    "objective": "Produce a writing attempt before Coach feedback.",
+    "evidence_class": "training_performance"
+  },
+  "estimated_duration_minutes": 5,
+  "training_rationale": {
+    "summary": "Establish one contrastive retrieval observation.",
+    "evidence_refs": []
+  },
+  "target_skills": [
+    "writing.coherence"
+  ],
+  "training_hypotheses": [],
+  "resources": [
+    {
+      "resource_id": "res-question",
+      "resource_type": "text",
+      "content_format": "plain_text",
+      "content": "Write a focused paragraph.",
+      "provenance": {
+        "origin_type": "generated",
+        "source_identifier": null,
+        "generator": {
+          "producer": "Codex",
+          "producer_version": "gpt-5"
+        },
+        "content_hash": "sha256:a4895c80550ce464dad33a679cb0a55c3ba12c4a6069395bbb3c7d6cde9871de",
+        "license": null,
+        "attribution": null,
+        "redistribution_status": "cleared"
+      }
+    }
+  ],
+  "phases": [
+    {
+      "phase_id": "phase-writing-generation",
+      "kind": "generation",
+      "activity_ids": [
+        "act-writing-original"
+      ]
+    }
+  ],
+  "activities": [
+    {
+      "activity_id": "act-writing-original",
+      "type": "TEXT_RESPONSE",
+      "phase_id": "phase-writing-generation",
+      "skill_refs": [
+        "writing.coherence"
+      ],
+      "prompt": "Choose the correct relation.",
+      "resource_refs": [
+        "res-question"
+      ],
+      "config": {
+        "response_kind": "long",
+        "min_characters": 100,
+        "max_characters": 1800,
+        "artifact_type": "essay"
+      },
+      "completion": {
+        "required": true,
+        "submit_required": true
+      },
+      "feedback": {
+        "timing": "none",
+        "allowed": []
+      },
+      "timeout": {
+        "limit_seconds": 120,
+        "on_timeout": "record_incomplete"
+      },
+      "accessibility": {
+        "keyboard_operable": true,
+        "screen_reader_label": "False or Not Given selection"
+      },
+      "evidence_requirements": [
+        "answer_submitted",
+        "artifact_created"
+      ],
+      "attempt_id": "attempt-writing-original",
+      "pedagogical_intent": "generation",
+      "output_contract": {
+        "kind": "text",
+        "artifact_type": "essay"
+      },
+      "relationships": {
+        "revision_of": null,
+        "feedback_ref": null,
+        "source_output_ref": null,
+        "prior_evidence_refs": []
+      }
+    }
+  ],
+  "feedback_policy": {
+    "mode": "training",
+    "allow_hints": false,
+    "allow_retry": true,
+    "correction_timing": "after_submission"
+  },
+  "completion_policy": {
+    "required_activity_ids": [
+      "act-writing-original"
+    ],
+    "allow_partial_result": false,
+    "coach_checkpoint": {
+      "checkpoint_id": "checkpoint-writing-001",
+      "checkpoint_reason": "writing_feedback",
+      "source_activity_ids": [
+        "act-writing-original"
+      ]
+    }
+  },
+  "evidence_requirements": {
+    "required_event_types": [
+      "session_started",
+      "activity_started",
+      "answer_submitted",
+      "artifact_created",
+      "activity_completed",
+      "coach_checkpoint_reached"
+    ],
+    "artifact_types": [
+      "essay"
+    ]
+  },
+  "run_id": "run-writing-checkpoint-001",
+  "segment_id": "segment-writing-001",
+  "protected_evaluation_ref": null,
+  "continuation": null
+}

@@ -1,0 +1,64 @@
+{
+  "schema_version": "0.1.0",
+  "protocol_version": "0.1.0",
+  "policy_version": "0.1.0",
+  "decision_id": "decision-pattern-002",
+  "learner_id": "learner-local-001",
+  "skill_id": "reading.tfng.semantic-relation",
+  "error_pattern_id": "pattern-tfng-absent-vs-false",
+  "decision_type": "qualification_update",
+  "reward_type": "pattern_broken",
+  "qualification": "revoked",
+  "evaluated_at": "2026-09-10T09:00:00Z",
+  "evidence_chain": {
+    "recurring_weakness": [
+      {
+        "evidence_ref": "evt-weak-001",
+        "session_id": "session-weak-001",
+        "occurred_at": "2026-08-20T09:00:00Z",
+        "outcome": "unsuccessful"
+      },
+      {
+        "evidence_ref": "evt-weak-002",
+        "session_id": "session-weak-002",
+        "occurred_at": "2026-08-21T09:00:00Z",
+        "outcome": "unsuccessful"
+      }
+    ],
+    "targeted_intervention": {
+      "evidence_ref": "evt-intervention-001",
+      "occurred_at": "2026-08-22T09:00:00Z"
+    },
+    "repeated_improvement": [
+      {
+        "evidence_ref": "evt-improve-001",
+        "session_id": "session-improve-001",
+        "occurred_at": "2026-08-22T09:10:00Z",
+        "outcome": "successful"
+      },
+      {
+        "evidence_ref": "evt-improve-002",
+        "session_id": "session-improve-002",
+        "occurred_at": "2026-08-22T10:00:00Z",
+        "outcome": "successful"
+      }
+    ],
+    "delayed_retrieval": {
+      "evidence_ref": "evt-delay-001",
+      "occurred_at": "2026-08-23T09:00:00Z",
+      "delay_seconds": 86400,
+      "outcome": "successful"
+    },
+    "transfer": {
+      "evidence_ref": "evt-transfer-001",
+      "source_resource_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "transfer_resource_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "outcome": "successful"
+    },
+    "unresolved_contradictory_assessment_refs": [],
+    "regression_evidence_refs": [
+      "evt-assessment-regression-001"
+    ]
+  },
+  "supersedes": "decision-pattern-001"
+}

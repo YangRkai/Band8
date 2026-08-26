@@ -1,0 +1,21 @@
+{
+  "schema_version": "0.1.0",
+  "protocol_version": "0.1.0",
+  "evaluation_id": "eval-assessment-001",
+  "package_id": "pkg-assessment-boss-001",
+  "package_hash": "sha256:314e4f4ce97e242b80df2b16aabf8c5f7980a43fb1577e2f22300cf2ad684225",
+  "content_hash": "sha256:c7c0bf7c1fad9f3e7a0106775ad25c9441a5e7b383fc785d35ef2545aa7d0e88",
+  "entries": [
+    {
+      "activity_id": "act-assessment",
+      "scoring_rule": "exact_option_set",
+      "correct_option_ids": [
+        "not-given"
+      ],
+      "accepted_texts": [],
+      "expected_order": [],
+      "expected_pairs": [],
+      "integrity_ref": "sha256:738468f6b3eadc9f82a241922d4cc575651a873d274bfa7d4de46314b32abce6"
+    }
+  ]
+}

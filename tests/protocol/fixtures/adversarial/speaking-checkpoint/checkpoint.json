@@ -1,0 +1,16 @@
+{
+  "schema_version": "0.1.0",
+  "protocol_version": "0.1.0",
+  "checkpoint_id": "checkpoint-speaking-001",
+  "checkpoint_reason": "speaking_feedback",
+  "created_at": "2026-08-26T12:00:00Z",
+  "session_id": "session-speaking-001",
+  "run_id": "run-speaking-checkpoint-001",
+  "segment_id": "segment-speaking-001",
+  "package_id": "pkg-speaking-checkpoint-a",
+  "package_hash": "sha256:4cad0e2cfc790a7ba41af85d64864d03025d62e2cc841b42fc8c0fd53e1fbf61",
+  "required_evidence_refs": [
+    "artifact-speaking-original-001"
+  ],
+  "status": "awaiting_coach"
+}

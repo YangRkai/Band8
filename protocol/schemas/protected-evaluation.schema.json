@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://band8.local/protocol/0.1/protected-evaluation.schema.json",
+  "title": "Band8 Protected Evaluation 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "protocol_version", "evaluation_id", "package_id", "package_hash", "content_hash", "entries"],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "protocol_version": {"const": "0.1.0"},
+    "evaluation_id": {"$ref": "#/$defs/id"},
+    "package_id": {"$ref": "#/$defs/id"},
+    "package_hash": {"$ref": "#/$defs/hash"},
+    "content_hash": {"$ref": "#/$defs/hash"},
+    "entries": {
+      "type": "array", "minItems": 1, "maxItems": 64,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["activity_id", "scoring_rule", "correct_option_ids", "accepted_texts", "expected_order", "expected_pairs", "integrity_ref"],
+        "properties": {
+          "activity_id": {"$ref": "#/$defs/id"},
+          "scoring_rule": {"enum": ["exact_option_set", "normalized_text_set", "exact_order", "exact_pairs"]},
+          "correct_option_ids": {"$ref": "#/$defs/ids"},
+          "accepted_texts": {"type": "array", "maxItems": 32, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 1000}},
+          "expected_order": {"$ref": "#/$defs/ids"},
+          "expected_pairs": {"type": "array", "maxItems": 30, "items": {"type": "object", "additionalProperties": false, "required": ["left_id", "right_id"], "properties": {"left_id": {"$ref": "#/$defs/id"}, "right_id": {"$ref": "#/$defs/id"}}}},
+          "integrity_ref": {"$ref": "#/$defs/hash"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$"},
+    "hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "ids": {"type": "array", "maxItems": 128, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
+  }
+}

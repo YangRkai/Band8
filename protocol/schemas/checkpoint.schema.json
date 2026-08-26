@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://band8.local/protocol/0.1/checkpoint.schema.json",
+  "title": "Band8 Coach Checkpoint Manifest 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "protocol_version", "checkpoint_id", "checkpoint_reason", "created_at", "session_id", "run_id", "segment_id", "package_id", "package_hash", "required_evidence_refs", "status"],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "protocol_version": {"const": "0.1.0"},
+    "checkpoint_id": {"$ref": "#/$defs/id"},
+    "checkpoint_reason": {"enum": ["writing_feedback", "speaking_feedback", "content_dependent_correction", "adaptive_subjective_retry"]},
+    "created_at": {"type": "string", "format": "date-time"},
+    "session_id": {"$ref": "#/$defs/id"},
+    "run_id": {"$ref": "#/$defs/id"},
+    "segment_id": {"$ref": "#/$defs/id"},
+    "package_id": {"$ref": "#/$defs/id"},
+    "package_hash": {"$ref": "#/$defs/hash"},
+    "required_evidence_refs": {"type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+    "status": {"const": "awaiting_coach"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$"},
+    "hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

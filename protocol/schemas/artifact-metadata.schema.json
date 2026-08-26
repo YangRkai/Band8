@@ -3,10 +3,11 @@
   "$id": "https://band8.local/protocol/0.1/artifact-metadata.schema.json",
   "title": "Band8 Artifact Metadata 0.1",
   "type": "object", "additionalProperties": false,
-  "required": ["schema_version", "protocol_version", "artifact_id", "artifact_type", "created_at", "source_activity_id", "content_hash", "relative_path"],
+  "required": ["schema_version", "protocol_version", "artifact_id", "session_id", "run_id", "segment_id", "package_id", "artifact_type", "created_at", "source_activity_id", "content_hash", "relative_path"],
   "properties": {
     "schema_version": {"const": "0.1.0"}, "protocol_version": {"const": "0.1.0"},
     "artifact_id": {"$ref": "#/$defs/id"},
+    "session_id": {"$ref": "#/$defs/id"}, "run_id": {"$ref": "#/$defs/id"}, "segment_id": {"$ref": "#/$defs/id"}, "package_id": {"$ref": "#/$defs/id"},
     "artifact_type": {"enum": ["essay", "rewrite", "speaking_audio", "transcript", "highlighted_evidence", "long_form_answer"]},
     "created_at": {"type": "string", "format": "date-time"}, "source_activity_id": {"$ref": "#/$defs/id"},
     "content_hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},

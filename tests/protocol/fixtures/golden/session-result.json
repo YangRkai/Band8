@@ -1,8 +1,8 @@
 {
-  "schema_version": "0.1.0", "protocol_version": "0.1.0", "session_id": "session-reading-001", "package_id": "pkg-reading-tfng-001",
+  "schema_version": "0.1.0", "protocol_version": "0.1.0", "session_id": "session-reading-001", "run_id": "run-pkg-reading-tfng-001", "segment_id": "segment-pkg-reading-tfng-001", "package_id": "pkg-reading-tfng-001",
   "started_at": "2026-08-26T04:00:00Z", "completed_at": "2026-08-26T04:01:30Z", "effective_duration_seconds": 90,
   "activities_completed": ["act-read", "act-select", "act-evidence"],
-  "objective_results": [{"result_id": "result-tfng-001", "performance_class": "transfer_performance", "outcome": "successful", "evidence_refs": ["evt-007", "evt-010"]}],
+  "objective_results": [{"result_id": "result-tfng-001", "activity_id": "act-select", "performance_class": "transfer_performance", "outcome": "successful", "evidence_refs": ["evt-007", "evt-010"]}],
   "user_artifacts": ["artifact-highlight-001"], "corrections": [], "retries": [], "self_assessments": [], "abandonment": null, "reinforcement_events": [],
   "evidence_refs": ["evt-003", "evt-007", "evt-010", "artifact-highlight-001"],
   "source_event_ids": ["evt-001", "evt-002", "evt-003", "evt-004", "evt-005", "evt-006", "evt-007", "evt-008", "evt-009", "evt-010", "evt-011", "evt-012", "evt-013"]

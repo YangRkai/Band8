@@ -5,34 +5,21 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schema_version", "protocol_version", "package_id", "created_at", "generator",
-    "contract_versions", "learner_goal", "session_intent", "estimated_duration_minutes",
-    "training_rationale", "target_skills", "training_hypotheses", "resources", "phases",
-    "activities", "feedback_policy", "completion_policy", "reinforcement_hints",
-    "evidence_requirements"
+    "schema_version", "protocol_version", "package_id", "run_id", "segment_id",
+    "created_at", "generator", "contract_versions", "learner_goal", "session_intent",
+    "estimated_duration_minutes", "training_rationale", "target_skills",
+    "training_hypotheses", "resources", "phases", "activities", "feedback_policy",
+    "completion_policy", "protected_evaluation_ref", "continuation", "evidence_requirements"
   ],
   "properties": {
     "schema_version": {"const": "0.1.0"},
     "protocol_version": {"const": "0.1.0"},
     "package_id": {"$ref": "#/$defs/id"},
+    "run_id": {"$ref": "#/$defs/id"},
+    "segment_id": {"$ref": "#/$defs/id"},
     "created_at": {"type": "string", "format": "date-time"},
-    "generator": {
-      "type": "object", "additionalProperties": false,
-      "required": ["producer", "producer_version"],
-      "properties": {
-        "producer": {"type": "string", "minLength": 1, "maxLength": 80},
-        "producer_version": {"type": "string", "minLength": 1, "maxLength": 80}
-      }
-    },
-    "contract_versions": {
-      "type": "object", "additionalProperties": false,
-      "required": ["pedagogy_version", "coach_contract_version", "skill_taxonomy_version"],
-      "properties": {
-        "pedagogy_version": {"const": "0.1.0"},
-        "coach_contract_version": {"const": "0.1.0"},
-        "skill_taxonomy_version": {"const": "0.1.0"}
-      }
-    },
+    "generator": {"$ref": "#/$defs/producer"},
+    "contract_versions": {"$ref": "#/$defs/contract_versions"},
     "learner_goal": {"$ref": "#/$defs/learner_goal"},
     "session_intent": {
       "type": "object", "additionalProperties": false,
@@ -69,12 +56,13 @@
       "type": "array", "maxItems": 64,
       "items": {
         "type": "object", "additionalProperties": false,
-        "required": ["resource_id", "resource_type", "content_format", "content"],
+        "required": ["resource_id", "resource_type", "content_format", "content", "provenance"],
         "properties": {
           "resource_id": {"$ref": "#/$defs/id"},
-          "resource_type": {"enum": ["text", "audio_script", "rubric", "comparison"]},
+          "resource_type": {"enum": ["text", "audio_script", "rubric", "comparison", "feedback"]},
           "content_format": {"enum": ["plain_text", "markdown_subset"]},
-          "content": {"type": "string", "minLength": 1, "maxLength": 12000}
+          "content": {"type": "string", "minLength": 1, "maxLength": 12000},
+          "provenance": {"$ref": "#/$defs/provenance"}
         }
       }
     },
@@ -90,10 +78,7 @@
         }
       }
     },
-    "activities": {
-      "type": "array", "minItems": 1, "maxItems": 64,
-      "items": {"$ref": "#/$defs/activity"}
-    },
+    "activities": {"type": "array", "minItems": 1, "maxItems": 64, "items": {"$ref": "#/$defs/activity"}},
     "feedback_policy": {
       "type": "object", "additionalProperties": false,
       "required": ["mode", "allow_hints", "allow_retry", "correction_timing"],
@@ -106,17 +91,37 @@
     },
     "completion_policy": {
       "type": "object", "additionalProperties": false,
-      "required": ["required_activity_ids", "allow_partial_result"],
+      "required": ["required_activity_ids", "allow_partial_result", "coach_checkpoint"],
       "properties": {
         "required_activity_ids": {"type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
-        "allow_partial_result": {"type": "boolean"}
+        "allow_partial_result": {"type": "boolean"},
+        "coach_checkpoint": {
+          "type": ["object", "null"], "additionalProperties": false,
+          "required": ["checkpoint_id", "checkpoint_reason", "source_activity_ids"],
+          "properties": {
+            "checkpoint_id": {"$ref": "#/$defs/id"},
+            "checkpoint_reason": {"enum": ["writing_feedback", "speaking_feedback", "content_dependent_correction", "adaptive_subjective_retry"]},
+            "source_activity_ids": {"type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
+          }
+        }
       }
     },
-    "reinforcement_hints": {
-      "type": "object", "additionalProperties": false,
-      "required": ["candidate_types"],
+    "protected_evaluation_ref": {
+      "type": ["object", "null"], "additionalProperties": false,
+      "required": ["evaluation_id", "content_hash"],
       "properties": {
-        "candidate_types": {"type": "array", "maxItems": 3, "uniqueItems": true, "items": {"enum": ["breakthrough_candidate", "boss_fight_candidate", "milestone_candidate"]}}
+        "evaluation_id": {"$ref": "#/$defs/id"},
+        "content_hash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "continuation": {
+      "type": ["object", "null"], "additionalProperties": false,
+      "required": ["continuation_of", "prior_segment_id", "checkpoint_id", "required_evidence_refs"],
+      "properties": {
+        "continuation_of": {"$ref": "#/$defs/id"},
+        "prior_segment_id": {"$ref": "#/$defs/id"},
+        "checkpoint_id": {"$ref": "#/$defs/id"},
+        "required_evidence_refs": {"type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
       }
     },
     "evidence_requirements": {
@@ -130,8 +135,45 @@
   },
   "$defs": {
     "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$"},
+    "hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "skill_id": {"type": "string", "pattern": "^[a-z][a-z0-9.-]{2,127}$"},
     "id_array": {"type": "array", "maxItems": 64, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+    "producer": {
+      "type": "object", "additionalProperties": false,
+      "required": ["producer", "producer_version"],
+      "properties": {
+        "producer": {"type": "string", "minLength": 1, "maxLength": 80},
+        "producer_version": {"type": "string", "minLength": 1, "maxLength": 80}
+      }
+    },
+    "contract_versions": {
+      "type": "object", "additionalProperties": false,
+      "required": ["b8tp_version", "package_schema_version", "evidence_contract_version", "reinforcement_contract_version", "pedagogy_version", "coach_contract_version", "skill_taxonomy_version", "runtime_version", "validator_version"],
+      "properties": {
+        "b8tp_version": {"const": "0.1.0"},
+        "package_schema_version": {"const": "0.1.0"},
+        "evidence_contract_version": {"const": "0.1.0"},
+        "reinforcement_contract_version": {"const": "0.1.0"},
+        "pedagogy_version": {"const": "0.1.0"},
+        "coach_contract_version": {"const": "0.1.0"},
+        "skill_taxonomy_version": {"const": "0.1.0"},
+        "runtime_version": {"const": "0.1.0"},
+        "validator_version": {"const": "0.1.0"}
+      }
+    },
+    "provenance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["origin_type", "source_identifier", "generator", "content_hash", "license", "attribution", "redistribution_status"],
+      "properties": {
+        "origin_type": {"enum": ["generated", "user_provided", "licensed", "public_domain", "unknown"]},
+        "source_identifier": {"type": ["string", "null"], "maxLength": 500},
+        "generator": {"type": ["object", "null"], "additionalProperties": false, "required": ["producer", "producer_version"], "properties": {"producer": {"type": "string", "minLength": 1, "maxLength": 80}, "producer_version": {"type": "string", "minLength": 1, "maxLength": 80}}},
+        "content_hash": {"$ref": "#/$defs/hash"},
+        "license": {"type": ["string", "null"], "maxLength": 300},
+        "attribution": {"type": ["string", "null"], "maxLength": 500},
+        "redistribution_status": {"enum": ["cleared", "not_cleared"]}
+      }
+    },
     "learner_goal": {
       "type": "object", "additionalProperties": false,
       "required": ["overall_target", "section_minimums"],
@@ -151,15 +193,35 @@
     },
     "activity": {
       "type": "object", "additionalProperties": false,
-      "required": ["activity_id", "type", "phase_id", "skill_refs", "prompt", "resource_refs", "config", "completion", "feedback", "timeout", "accessibility", "evidence_requirements"],
+      "required": ["activity_id", "attempt_id", "type", "phase_id", "pedagogical_intent", "skill_refs", "prompt", "resource_refs", "config", "output_contract", "relationships", "completion", "feedback", "timeout", "accessibility", "evidence_requirements"],
       "properties": {
         "activity_id": {"$ref": "#/$defs/id"},
-        "type": {"enum": ["INSTRUCTION", "PRESENT_TEXT", "PLAY_AUDIO", "SELECT", "MATCH", "ORDER", "TEXT_RESPONSE", "EVIDENCE_SELECT", "SPEAK_RECORD", "COMPARE_REVISE", "RETRIEVAL_PROMPT", "SELF_ASSESS"]},
+        "attempt_id": {"$ref": "#/$defs/id"},
+        "type": {"enum": ["INSTRUCTION", "PRESENT_TEXT", "PLAY_AUDIO", "SELECT", "MATCH", "ORDER", "TEXT_RESPONSE", "EVIDENCE_SELECT", "SPEAK_RECORD", "SELF_ASSESS"]},
         "phase_id": {"$ref": "#/$defs/id"},
+        "pedagogical_intent": {"enum": ["cue", "generation", "instruction", "practice", "correction", "retry", "retrieval", "transfer", "assessment", "reflection"]},
         "skill_refs": {"type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true, "items": {"$ref": "#/$defs/skill_id"}},
         "prompt": {"type": "string", "minLength": 1, "maxLength": 2000},
         "resource_refs": {"type": "array", "maxItems": 8, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
         "config": {"type": "object", "maxProperties": 20},
+        "output_contract": {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "artifact_type"],
+          "properties": {
+            "kind": {"enum": ["none", "selection", "mapping", "order", "text", "evidence_spans", "audio", "self_rating"]},
+            "artifact_type": {"type": ["string", "null"], "enum": [null, "essay", "rewrite", "speaking_audio", "transcript", "highlighted_evidence", "long_form_answer"]}
+          }
+        },
+        "relationships": {
+          "type": "object", "additionalProperties": false,
+          "required": ["revision_of", "feedback_ref", "source_output_ref", "prior_evidence_refs"],
+          "properties": {
+            "revision_of": {"type": ["string", "null"], "maxLength": 128},
+            "feedback_ref": {"type": ["string", "null"], "maxLength": 128},
+            "source_output_ref": {"type": ["string", "null"], "maxLength": 128},
+            "prior_evidence_refs": {"$ref": "#/$defs/id_array"}
+          }
+        },
         "completion": {
           "type": "object", "additionalProperties": false,
           "required": ["required", "submit_required"],

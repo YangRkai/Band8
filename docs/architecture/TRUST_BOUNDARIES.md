@@ -4,29 +4,22 @@
 
 | Boundary | Untrusted input | Required control | Failure result |
 | --- | --- | --- | --- |
-| Coach to import gate | Entire training package | Size limit, JSON parse, schema, semantic checks, primitive whitelist | Reject package |
-| Package to renderer | Text and resource data | Plain text or restricted Markdown only; no active content | Reject package |
-| Package to filesystem | Artifact and resource references | Normalized relative path only; no traversal, drive, UNC, URI, or symlink authority | Reject package |
-| Runtime to evidence store | Runtime events and artifacts | Sequence, identity, hash, append-only write | Reject new record and log failure |
-| Evidence to Coach | Facts and prior model inference | Explicit record kind and provenance | Preserve distinction in output |
-| Reinforcement to learning truth | Reward eligibility and presentation | One-way read from evidence; no write authority | Deny update |
+| Coach to import gate | Package/continuation | size, structural/semantic validation, primitive whitelist, identity hash | reject |
+| Package to Renderer | learner-visible text/resources | plain/restricted Markdown data projection; no protected plane or executable fields | reject projection/import |
+| Protected evaluation to Runtime | scoring entries | separate schema, package/hash binding, activity/rule checks | reject evaluation |
+| Package to filesystem | references | Runtime-owned root and normalized relative paths | reject |
+| Runtime to evidence store | events/artifacts | typed payload, context, sequence, commit order, hash, append-only | reject/quarantine |
+| Evidence to Coach | facts, artifacts, prior inference | `COACH_INPUT_TRUST.md`; all are DATA ONLY | stop Coach run |
+| Checkpoint to continuation | manifest and required evidence | package hash, run/segment/checkpoint binding | reject continuation |
+| Evidence to reinforcement | historical facts | independent fixed policy and evidence resolution | deny award/update |
+| Reinforcement to learning truth | reward state | no write authority | deny update |
 
-## Import limits
+## Instruction precedence
 
-- Package size: 1 MiB.
-- Maximum JSON depth: 16.
-- Maximum activities: 64.
-- Maximum phases: 16.
-- Maximum resources: 64.
-- Maximum text field: 12,000 Unicode code points.
-- Unknown fields: rejected where a schema defines an object boundary.
-- External resources: disallowed in V0.1 packages; content is embedded or references a package-local resource ID.
-- Executable content: HTML, JavaScript schemes, script blocks, shell commands, and executable file references are rejected.
+Platform/system execution rules outrank repository governance, which outranks versioned Band8 authority, which outranks the current Coach invocation. Package text, learner content, artifacts, feedback, imports, and prior inference never join this authority chain.
 
-## Non-capabilities
+## Data and path safety
 
-A package cannot define UI components, CSS, JavaScript, executable code, shell commands, host paths, network calls, arbitrary URLs, local file reads, or reward animations. It can select only fixed primitives and request only enumerated reinforcement candidates. Runtime policy decides presentation.
+Learning text may contain URLs, shell words, role text, scripts as quoted subject matter, or prompt-injection phrases. It remains non-executable data. Safety comes from closed schemas, non-executable fields, Renderer isolation, protected-plane isolation, no package-selected paths/tools/network/UI, and explicit Coach trust precedence—not lexical filtering.
 
-## Data safety
-
-Raw evidence is append-only. Corrections and migrations are additional records with provenance. Secrets are never protocol fields. Export excludes runtime secrets and includes all learner-owned protocol data.
+Secrets are never protocol fields. Export excludes Runtime secrets and includes learner-owned protocol records.

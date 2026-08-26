@@ -12,6 +12,7 @@
 8. **Difficulty calibration:** choose a meaningful challenge with a reasonable success probability and no deliberate reward farming.
 9. **Deliberate practice:** prioritize a high-leverage bottleneck or uncertainty-reducing test over equal allocation.
 10. **Assessment integrity:** assessment runs without hints, correction, retry, adaptive easing, or reward reveal during performance.
+11. **Subjective feedback checkpoint:** content-dependent Writing and Speaking feedback is produced by the External Coach only after the learner artifact is durably evidenced; Runtime enters `AWAITING_COACH` and waits for a validated continuation.
 
 ## Evidence interpretation
 
@@ -19,4 +20,4 @@ Self-rating is metacognitive evidence only. Training, transfer, and assessment o
 
 ## Version recording
 
-Every package records `pedagogy_version`, `coach_contract_version`, and `skill_taxonomy_version`, enabling later replay and reinterpretation.
+Every package records the complete contract set defined by `VERSIONING.md`, enabling later replay and an explicit unsupported-replay result.

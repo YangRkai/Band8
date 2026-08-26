@@ -1,0 +1,23 @@
+{
+  "schema_version": "0.1.0",
+  "protocol_version": "0.1.0",
+  "hypothesis_id": "hyp-tfng-rejected-001",
+  "claim": "The learner may confuse absent support with semantic contradiction.",
+  "skill_refs": [
+    "reading.tfng.semantic-relation"
+  ],
+  "confidence": 0.1,
+  "supporting_evidence": [
+    "evt-006"
+  ],
+  "contradicting_evidence": [
+    "evt-007",
+    "evt-010"
+  ],
+  "created_at": "2026-08-20T08:00:00Z",
+  "last_updated_at": "2026-08-26T04:02:00Z",
+  "status": "rejected",
+  "next_test": "Do not target this rejected explanation; test alternative active hypotheses.",
+  "producer": "Codex",
+  "producer_version": "gpt-5"
+}

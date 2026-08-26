@@ -1,0 +1,21 @@
+{
+  "schema_version": "0.1.0",
+  "protocol_version": "0.1.0",
+  "evaluation_id": "eval-reading-001",
+  "package_id": "pkg-reading-tfng-001",
+  "package_hash": "sha256:37f1554b927e7cf383aff45e614bddf67d9e1d05c43c71265f3a83dca553b239",
+  "content_hash": "sha256:5971bb6e429fd080edc698cad83d913f353f12d657419b7d96b4a10132766ea5",
+  "entries": [
+    {
+      "activity_id": "act-select",
+      "scoring_rule": "exact_option_set",
+      "correct_option_ids": [
+        "not-given"
+      ],
+      "accepted_texts": [],
+      "expected_order": [],
+      "expected_pairs": [],
+      "integrity_ref": "sha256:356adcf05fa97c34091147127667a20fbe1e8b4f6f2f3ffe81eedf486a038653"
+    }
+  ]
+}

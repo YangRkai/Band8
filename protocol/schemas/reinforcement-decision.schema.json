@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://band8.local/protocol/0.1/reinforcement-decision.schema.json",
+  "title": "Band8 Reinforcement Decision 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "protocol_version", "policy_version", "decision_id", "learner_id", "skill_id", "error_pattern_id", "decision_type", "reward_type", "qualification", "evaluated_at", "evidence_chain", "supersedes"],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "protocol_version": {"const": "0.1.0"},
+    "policy_version": {"const": "0.1.0"},
+    "decision_id": {"$ref": "#/$defs/id"},
+    "learner_id": {"$ref": "#/$defs/id"},
+    "skill_id": {"type": "string", "pattern": "^[a-z][a-z0-9.-]{2,127}$"},
+    "error_pattern_id": {"$ref": "#/$defs/id"},
+    "decision_type": {"enum": ["historical_award", "qualification_update"]},
+    "reward_type": {"const": "pattern_broken"},
+    "qualification": {"enum": ["confirmed", "weakened", "revoked", "superseded"]},
+    "evaluated_at": {"type": "string", "format": "date-time"},
+    "evidence_chain": {
+      "type": "object", "additionalProperties": false,
+      "required": ["recurring_weakness", "targeted_intervention", "repeated_improvement", "delayed_retrieval", "transfer", "unresolved_contradictory_assessment_refs", "regression_evidence_refs"],
+      "properties": {
+        "recurring_weakness": {"type": "array", "maxItems": 16, "items": {"$ref": "#/$defs/observation"}},
+        "targeted_intervention": {"type": ["object", "null"], "additionalProperties": false, "required": ["evidence_ref", "occurred_at"], "properties": {"evidence_ref": {"$ref": "#/$defs/id"}, "occurred_at": {"type": "string", "format": "date-time"}}},
+        "repeated_improvement": {"type": "array", "maxItems": 16, "items": {"$ref": "#/$defs/observation"}},
+        "delayed_retrieval": {"type": ["object", "null"], "additionalProperties": false, "required": ["evidence_ref", "occurred_at", "delay_seconds", "outcome"], "properties": {"evidence_ref": {"$ref": "#/$defs/id"}, "occurred_at": {"type": "string", "format": "date-time"}, "delay_seconds": {"type": "integer", "minimum": 0}, "outcome": {"enum": ["successful", "partial", "unsuccessful"]}}},
+        "transfer": {"type": ["object", "null"], "additionalProperties": false, "required": ["evidence_ref", "source_resource_hash", "transfer_resource_hash", "outcome"], "properties": {"evidence_ref": {"$ref": "#/$defs/id"}, "source_resource_hash": {"$ref": "#/$defs/hash"}, "transfer_resource_hash": {"$ref": "#/$defs/hash"}, "outcome": {"enum": ["successful", "partial", "unsuccessful"]}}},
+        "unresolved_contradictory_assessment_refs": {"$ref": "#/$defs/ids"},
+        "regression_evidence_refs": {"$ref": "#/$defs/ids"}
+      }
+    },
+    "supersedes": {"type": ["string", "null"], "maxLength": 128}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$"},
+    "hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "ids": {"type": "array", "maxItems": 128, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+    "observation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["evidence_ref", "session_id", "occurred_at", "outcome"],
+      "properties": {
+        "evidence_ref": {"$ref": "#/$defs/id"},
+        "session_id": {"$ref": "#/$defs/id"},
+        "occurred_at": {"type": "string", "format": "date-time"},
+        "outcome": {"enum": ["successful", "partial", "unsuccessful"]}
+      }
+    }
+  }
+}

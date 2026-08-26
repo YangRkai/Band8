@@ -1,0 +1,161 @@
+{
+  "schema_version": "0.1.0",
+  "protocol_version": "0.1.0",
+  "package_id": "pkg-speaking-checkpoint-a",
+  "created_at": "2026-08-26T00:00:00Z",
+  "generator": {
+    "producer": "Codex",
+    "producer_version": "gpt-5"
+  },
+  "contract_versions": {
+    "b8tp_version": "0.1.0",
+    "package_schema_version": "0.1.0",
+    "evidence_contract_version": "0.1.0",
+    "reinforcement_contract_version": "0.1.0",
+    "pedagogy_version": "0.1.0",
+    "coach_contract_version": "0.1.0",
+    "skill_taxonomy_version": "0.1.0",
+    "runtime_version": "0.1.0",
+    "validator_version": "0.1.0"
+  },
+  "learner_goal": {
+    "overall_target": 8.0,
+    "section_minimums": {
+      "listening": 7.5,
+      "reading": 7.5,
+      "writing": 7.5,
+      "speaking": 7.5
+    }
+  },
+  "session_intent": {
+    "mode": "training",
+    "objective": "Produce a speaking attempt before Coach feedback.",
+    "evidence_class": "training_performance"
+  },
+  "estimated_duration_minutes": 5,
+  "training_rationale": {
+    "summary": "Establish one contrastive retrieval observation.",
+    "evidence_refs": []
+  },
+  "target_skills": [
+    "speaking.fluency-coherence"
+  ],
+  "training_hypotheses": [],
+  "resources": [
+    {
+      "resource_id": "res-question",
+      "resource_type": "text",
+      "content_format": "plain_text",
+      "content": "Describe a difficult decision.",
+      "provenance": {
+        "origin_type": "generated",
+        "source_identifier": null,
+        "generator": {
+          "producer": "Codex",
+          "producer_version": "gpt-5"
+        },
+        "content_hash": "sha256:16dc7c0b258f6ea5bf531f867b60e13a67afb3080800c1e30d355482ec86e112",
+        "license": null,
+        "attribution": null,
+        "redistribution_status": "cleared"
+      }
+    }
+  ],
+  "phases": [
+    {
+      "phase_id": "phase-speaking-generation",
+      "kind": "generation",
+      "activity_ids": [
+        "act-speaking-original"
+      ]
+    }
+  ],
+  "activities": [
+    {
+      "activity_id": "act-speaking-original",
+      "type": "SPEAK_RECORD",
+      "phase_id": "phase-speaking-generation",
+      "skill_refs": [
+        "speaking.fluency-coherence"
+      ],
+      "prompt": "Choose the correct relation.",
+      "resource_refs": [
+        "res-question"
+      ],
+      "config": {
+        "min_seconds": 30,
+        "max_seconds": 180,
+        "max_takes": 1,
+        "artifact_type": "speaking_audio"
+      },
+      "completion": {
+        "required": true,
+        "submit_required": true
+      },
+      "feedback": {
+        "timing": "none",
+        "allowed": []
+      },
+      "timeout": {
+        "limit_seconds": 120,
+        "on_timeout": "record_incomplete"
+      },
+      "accessibility": {
+        "keyboard_operable": true,
+        "screen_reader_label": "False or Not Given selection"
+      },
+      "evidence_requirements": [
+        "speaking_recording_created",
+        "artifact_created"
+      ],
+      "attempt_id": "attempt-speaking-original",
+      "pedagogical_intent": "generation",
+      "output_contract": {
+        "kind": "audio",
+        "artifact_type": "speaking_audio"
+      },
+      "relationships": {
+        "revision_of": null,
+        "feedback_ref": null,
+        "source_output_ref": null,
+        "prior_evidence_refs": []
+      }
+    }
+  ],
+  "feedback_policy": {
+    "mode": "training",
+    "allow_hints": false,
+    "allow_retry": true,
+    "correction_timing": "after_submission"
+  },
+  "completion_policy": {
+    "required_activity_ids": [
+      "act-speaking-original"
+    ],
+    "allow_partial_result": false,
+    "coach_checkpoint": {
+      "checkpoint_id": "checkpoint-speaking-001",
+      "checkpoint_reason": "speaking_feedback",
+      "source_activity_ids": [
+        "act-speaking-original"
+      ]
+    }
+  },
+  "evidence_requirements": {
+    "required_event_types": [
+      "session_started",
+      "activity_started",
+      "speaking_recording_created",
+      "artifact_created",
+      "activity_completed",
+      "coach_checkpoint_reached"
+    ],
+    "artifact_types": [
+      "speaking_audio"
+    ]
+  },
+  "run_id": "run-speaking-checkpoint-001",
+  "segment_id": "segment-speaking-001",
+  "protected_evaluation_ref": null,
+  "continuation": null
+}

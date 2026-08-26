@@ -1,40 +1,32 @@
 # Reinforcement Contract 0.1
 
-## Objective
+## Authority
 
-Reinforcement promotes effective learning per effective minute and validated progress, not opening the application, clicking, time-on-screen, question count, or repeated easy work.
+Band8 Reinforcement Engine independently evaluates fixed versioned policy from authoritative evidence. Training packages contain no reinforcement candidates, thresholds, reward decisions, or presentation definitions. Coach supplies only training rationale, hypotheses, targets, and evidence intention and cannot grant a reward.
 
-## Fixed loop
+Rewards, animations, streaks, and badges have no reverse write path into evidence, learner diagnosis, hypothesis confidence, score estimates, or assessment truth.
 
-`CUE → OPEN LOOP → CHALLENGE → STRUGGLE → CORRECTION → RETRY → SUCCESS → PROGRESS REVEAL → ANTICIPATION → RETURN`
+## Historical award and current qualification
 
-Band8 owns this loop. The Coach may nominate only `breakthrough_candidate`, `boss_fight_candidate`, or `milestone_candidate`. Runtime evaluates fixed eligibility and chooses an enumerated presentation; package content cannot define reward UI.
+A `historical_award` is append-only evidence that policy conditions were satisfied at its evaluation time. `current qualification` is a derived status that later evidence may confirm, weaken, revoke, or supersede. A qualification update cites and supersedes the earlier decision without deleting its historical award.
 
-## Eligible behavior
+Thus a `PATTERN_BROKEN` award on one date remains historically true even if later assessment regression produces `qualification = revoked`. The interface must not equate the revoked current qualification with stable mastery.
 
-Genuine correction, successful retrieval, delayed retention, transfer, difficult-skill improvement, broken recurring errors, meaningful session completion, and sustained effective learning may contribute. Repeated easy items, idle time, login, rapid clicks, already-mastered repetition, and deliberate difficulty reduction do not.
+## PATTERN_BROKEN V0.1
 
-## Breakthrough rule
+Runtime policy version `0.1.0` requires all of these machine-verifiable conditions for a confirmed historical award:
 
-`PATTERN_BROKEN` requires all of the following facts:
+1. two unsuccessful observations for the same skill and error-pattern identity from at least two distinct earlier sessions;
+2. one targeted-intervention evidence reference after those weaknesses;
+3. two subsequent successful improvement observations;
+4. one successful retrieval observation at least 86,400 seconds after the intervention;
+5. one successful transfer observation whose source and transfer resource hashes differ;
+6. an empty set of unresolved contradictory assessment references at evaluation time.
 
-1. The same weakness appears in at least two earlier sessions.
-2. A targeted intervention names that weakness.
-3. At least two subsequent attempts improve under comparable conditions.
-4. A delayed retrieval at least 24 hours later succeeds.
-5. A transfer attempt in changed material succeeds.
-6. No unresolved contradictory assessment evidence invalidates the chain.
+Twenty-four hours is only the minimum delayed-evidence boundary. It never means mastery. Longer retention and later assessment may strengthen qualification; contradictory assessment may weaken or revoke it. Coach and Training Package cannot modify thresholds.
 
-Every criterion cites evidence. One correct answer can never qualify.
+Repeated easy items, one-session repetition, idle time, login, rapid clicks, already-mastered repetition, deliberate difficulty reduction, self-rating, and unverified event outcomes cannot satisfy this policy.
 
-## Effective training streak
+## Other reinforcement
 
-A streak day requires a meaningful completed session containing retrieval, correction, transfer, or assessment evidence. Login alone is excluded. One missed day enters recoverable grace; resuming with a meaningful session preserves historical achievements while marking the gap. Streak presentation never changes a score or diagnosis.
-
-## Goal gradient and open loops
-
-The interface may show distance to section minimum 7.5 and overall target 8.0 only from labeled official results, practice results, or calibrated estimates. Open loops identify an unproven skill and remaining validation condition without claiming progress.
-
-## Separation from learning truth
-
-Learning evidence feeds both Coach diagnosis and reinforcement eligibility. Rewards, animations, streaks, and badges have no reverse write path into learner state, assessment, hypothesis confidence, or score estimates.
+Boss fights, milestones, streaks, and presentation policy remain unavailable for eligibility awards until each receives a separately frozen deterministic policy. V0.1 machine validation closes only `PATTERN_BROKEN`.

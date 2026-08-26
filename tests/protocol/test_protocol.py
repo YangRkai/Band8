@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import json
+import hashlib
 import tempfile
 import unittest
 from copy import deepcopy
@@ -88,14 +89,11 @@ class ProtocolValidationTests(unittest.TestCase):
         def mutate_protocol_version(doc: dict) -> None:
             doc["protocol_version"] = "9.9.9"
 
-        def mutate_path_traversal(doc: dict) -> None:
-            doc["resources"][0]["content"] = "../../outside.txt"
+        def mutate_resource_hash_mismatch(doc: dict) -> None:
+            doc["resources"][0]["content"] = "Changed without updating provenance hash."
 
-        def mutate_absolute_path(doc: dict) -> None:
-            doc["resources"][0]["content"] = "C:\\Windows\\system.ini"
-
-        def mutate_executable_content(doc: dict) -> None:
-            doc["resources"][0]["content"] = "<script>alert(1)</script>"
+        def mutate_unknown_provenance(doc: dict) -> None:
+            doc["resources"][0]["provenance"]["origin_type"] = "scraped"
 
         def mutate_unsupported_field(doc: dict) -> None:
             doc["arbitrary_ui"] = {"component": "RemoteWidget"}
@@ -127,9 +125,8 @@ class ProtocolValidationTests(unittest.TestCase):
             "duplicate IDs": mutate_duplicate_ids,
             "malformed activity": mutate_malformed_activity,
             "invalid protocol version": mutate_protocol_version,
-            "path traversal": mutate_path_traversal,
-            "absolute path": mutate_absolute_path,
-            "executable content": mutate_executable_content,
+            "resource hash mismatch": mutate_resource_hash_mismatch,
+            "unknown provenance": mutate_unknown_provenance,
             "unsupported fields": mutate_unsupported_field,
             "excessive nesting": mutate_excessive_nesting,
             "excessive activity count": mutate_excessive_activity_count,
@@ -147,33 +144,11 @@ class ProtocolValidationTests(unittest.TestCase):
 
     def test_invalid_event_sequence_is_rejected(self) -> None:
         events = [
-            {
-                "schema_version": "0.1.0",
-                "protocol_version": "0.1.0",
-                "event_id": "evt-002",
-                "event_type": "session_completed",
-                "session_id": "session-invalid",
-                "package_id": "pkg-minimal-001",
-                "activity_id": None,
-                "timestamp": "2026-08-26T00:01:00Z",
-                "monotonic_offset_ms": 60000,
-                "sequence_number": 2,
-                "payload": {},
-            },
-            {
-                "schema_version": "0.1.0",
-                "protocol_version": "0.1.0",
-                "event_id": "evt-001",
-                "event_type": "session_started",
-                "session_id": "session-invalid",
-                "package_id": "pkg-minimal-001",
-                "activity_id": None,
-                "timestamp": "2026-08-26T00:00:00Z",
-                "monotonic_offset_ms": 0,
-                "sequence_number": 1,
-                "payload": {},
-            },
+            json.loads(line)
+            for line in (EXAMPLES / "example-events.ndjson").read_text(encoding="utf-8").splitlines()
+            if line.strip()
         ]
+        events[5]["sequence_number"] = 99
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "events.ndjson"
             path.write_text(
@@ -182,16 +157,34 @@ class ProtocolValidationTests(unittest.TestCase):
             )
             result = self.run_validator("events", str(path))
             self.assertNotEqual(result.returncode, 0)
+            self.assertIn("sequence_number", result.stderr)
 
-    def test_duplicate_package_id_is_rejected(self) -> None:
-        result = self.run_validator(
+    def test_duplicate_package_identity_distinguishes_idempotency_and_collision(self) -> None:
+        package_path = FIXTURES / "valid" / "minimal-training-package.json"
+        package = json.loads(package_path.read_text(encoding="utf-8"))
+        package_hash = "sha256:" + hashlib.sha256(
+            json.dumps(package, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        ).hexdigest()
+        same = self.run_validator(
             "package",
-            str(FIXTURES / "valid" / "minimal-training-package.json"),
+            str(package_path),
             "--seen-package-id",
             "pkg-minimal-001",
+            "--seen-package-hash",
+            package_hash,
         )
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("duplicate package_id", result.stderr)
+        self.assertEqual(same.returncode, 0, same.stdout + same.stderr)
+        self.assertIn("IDEMPOTENT", same.stdout)
+        collision = self.run_validator(
+            "package",
+            str(FIXTURES / "adversarial" / "duplicate-package-collision.json"),
+            "--seen-package-id",
+            "pkg-minimal-001",
+            "--seen-package-hash",
+            package_hash,
+        )
+        self.assertNotEqual(collision.returncode, 0)
+        self.assertIn("collision", collision.stderr)
 
     def test_golden_fixture_closes_the_protocol_loop(self) -> None:
         result = self.run_validator("golden", str(FIXTURES / "golden"))

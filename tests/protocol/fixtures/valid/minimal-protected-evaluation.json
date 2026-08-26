@@ -1,0 +1,21 @@
+{
+  "schema_version": "0.1.0",
+  "protocol_version": "0.1.0",
+  "evaluation_id": "eval-minimal-001",
+  "package_id": "pkg-minimal-001",
+  "package_hash": "sha256:592a4d72347c5e0814560daccb8901ad06bd414eda85835ee693c5972f0aa6ef",
+  "content_hash": "sha256:2320528de83bb659fd96d156968e095a64d7b109b8261d5f315ae4b3cdcf7cae",
+  "entries": [
+    {
+      "activity_id": "act-1",
+      "scoring_rule": "exact_option_set",
+      "correct_option_ids": [
+        "not-given"
+      ],
+      "accepted_texts": [],
+      "expected_order": [],
+      "expected_pairs": [],
+      "integrity_ref": "sha256:c2771cff227db2a0526a44153ba6e8122547f4e954b767b546afba5b18463272"
+    }
+  ]
+}

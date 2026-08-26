@@ -1,23 +1,290 @@
 {
-  "schema_version": "0.1.0", "protocol_version": "0.1.0", "package_id": "pkg-reading-tfng-001", "created_at": "2026-08-26T01:00:00Z",
-  "generator": {"producer": "Codex", "producer_version": "gpt-5"},
-  "contract_versions": {"pedagogy_version": "0.1.0", "coach_contract_version": "0.1.0", "skill_taxonomy_version": "0.1.0"},
-  "learner_goal": {"overall_target": 8.0, "section_minimums": {"listening": 7.5, "reading": 7.5, "writing": 7.5, "speaking": 7.5}},
-  "session_intent": {"mode": "training", "objective": "Distinguish contradiction from absent evidence in a new passage.", "evidence_class": "transfer_performance"},
+  "schema_version": "0.1.0",
+  "protocol_version": "0.1.0",
+  "package_id": "pkg-reading-tfng-001",
+  "created_at": "2026-08-26T01:00:00Z",
+  "generator": {
+    "producer": "Codex",
+    "producer_version": "gpt-5"
+  },
+  "contract_versions": {
+    "b8tp_version": "0.1.0",
+    "package_schema_version": "0.1.0",
+    "evidence_contract_version": "0.1.0",
+    "reinforcement_contract_version": "0.1.0",
+    "pedagogy_version": "0.1.0",
+    "coach_contract_version": "0.1.0",
+    "skill_taxonomy_version": "0.1.0",
+    "runtime_version": "0.1.0",
+    "validator_version": "0.1.0"
+  },
+  "learner_goal": {
+    "overall_target": 8.0,
+    "section_minimums": {
+      "listening": 7.5,
+      "reading": 7.5,
+      "writing": 7.5,
+      "speaking": 7.5
+    }
+  },
+  "session_intent": {
+    "mode": "training",
+    "objective": "Distinguish contradiction from absent evidence in a new passage.",
+    "evidence_class": "transfer_performance"
+  },
   "estimated_duration_minutes": 12,
-  "training_rationale": {"summary": "A contrastive transfer check tests the active TFNG hypothesis.", "evidence_refs": ["evt-history-tfng-002"]},
-  "target_skills": ["reading.tfng.semantic-relation"],
-  "training_hypotheses": [{"hypothesis_id": "hyp-tfng-031", "purpose": "test"}],
-  "available_evidence_refs": ["evt-history-tfng-002"],
-  "resources": [{"resource_id": "res-passage", "resource_type": "text", "content_format": "plain_text", "content": "The survey reports that most participants travelled by bus. It does not report how participants evaluated the price of rail travel."}],
-  "phases": [{"phase_id": "phase-transfer", "kind": "transfer", "activity_ids": ["act-read", "act-select", "act-evidence"]}],
-  "activities": [
-    {"activity_id": "act-read", "type": "PRESENT_TEXT", "phase_id": "phase-transfer", "skill_refs": ["reading.tfng.semantic-relation"], "prompt": "Read once before judging the claim.", "resource_refs": ["res-passage"], "config": {"display_mode": "continuous"}, "completion": {"required": true, "submit_required": false}, "feedback": {"timing": "none", "allowed": []}, "timeout": {"limit_seconds": 180, "on_timeout": "record_incomplete"}, "accessibility": {"keyboard_operable": true, "screen_reader_label": "Reading passage"}, "evidence_requirements": ["text_revisited", "activity_completed"]},
-    {"activity_id": "act-select", "type": "SELECT", "phase_id": "phase-transfer", "skill_refs": ["reading.tfng.semantic-relation"], "prompt": "Claim: Participants considered rail travel too expensive.", "resource_refs": ["res-passage"], "config": {"selection_mode": "one", "options": [{"option_id": "true", "label": "True"}, {"option_id": "false", "label": "False"}, {"option_id": "not-given", "label": "Not Given"}], "min_selections": 1, "max_selections": 1}, "completion": {"required": true, "submit_required": true}, "feedback": {"timing": "after_submission", "allowed": ["correctness", "explanation", "retry_invitation"]}, "timeout": {"limit_seconds": 120, "on_timeout": "submit_current"}, "accessibility": {"keyboard_operable": true, "screen_reader_label": "True False Not Given choices"}, "evidence_requirements": ["answer_selected", "answer_submitted"]},
-    {"activity_id": "act-evidence", "type": "EVIDENCE_SELECT", "phase_id": "phase-transfer", "skill_refs": ["reading.tfng.semantic-relation"], "prompt": "Select the passage span that supports your classification, or submit an empty selection when support is absent.", "resource_refs": ["res-passage"], "config": {"min_spans": 0, "max_spans": 2, "allow_revision": true, "preserve_raw_selection": true}, "completion": {"required": true, "submit_required": true}, "feedback": {"timing": "after_activity", "allowed": ["comparison"]}, "timeout": {"limit_seconds": 180, "on_timeout": "record_incomplete"}, "accessibility": {"keyboard_operable": true, "screen_reader_label": "Evidence span selector"}, "evidence_requirements": ["evidence_selected", "activity_completed"]}
+  "training_rationale": {
+    "summary": "A contrastive transfer check tests the active TFNG hypothesis.",
+    "evidence_refs": [
+      "evt-history-tfng-002"
+    ]
+  },
+  "target_skills": [
+    "reading.tfng.semantic-relation"
   ],
-  "feedback_policy": {"mode": "training", "allow_hints": false, "allow_retry": true, "correction_timing": "after_submission"},
-  "completion_policy": {"required_activity_ids": ["act-read", "act-select", "act-evidence"], "allow_partial_result": true},
-  "reinforcement_hints": {"candidate_types": ["breakthrough_candidate"]},
-  "evidence_requirements": {"required_event_types": ["session_started", "activity_started", "text_revisited", "answer_submitted", "evidence_selected", "activity_completed", "session_completed"], "artifact_types": ["highlighted_evidence"]}
+  "training_hypotheses": [
+    {
+      "hypothesis_id": "hyp-tfng-031",
+      "purpose": "test"
+    }
+  ],
+  "available_evidence_refs": [
+    "evt-history-tfng-002"
+  ],
+  "resources": [
+    {
+      "resource_id": "res-passage",
+      "resource_type": "text",
+      "content_format": "plain_text",
+      "content": "The survey reports that most participants travelled by bus. It does not report how participants evaluated the price of rail travel.",
+      "provenance": {
+        "origin_type": "generated",
+        "source_identifier": null,
+        "generator": {
+          "producer": "Codex",
+          "producer_version": "gpt-5"
+        },
+        "content_hash": "sha256:6fa87e2e3f6b9c56fc49933479a0f405dfbcd8cb89a89f1a51786f9a4b99149c",
+        "license": null,
+        "attribution": null,
+        "redistribution_status": "cleared"
+      }
+    }
+  ],
+  "phases": [
+    {
+      "phase_id": "phase-transfer",
+      "kind": "transfer",
+      "activity_ids": [
+        "act-read",
+        "act-select",
+        "act-evidence"
+      ]
+    }
+  ],
+  "activities": [
+    {
+      "activity_id": "act-read",
+      "type": "PRESENT_TEXT",
+      "phase_id": "phase-transfer",
+      "skill_refs": [
+        "reading.tfng.semantic-relation"
+      ],
+      "prompt": "Read once before judging the claim.",
+      "resource_refs": [
+        "res-passage"
+      ],
+      "config": {
+        "display_mode": "continuous"
+      },
+      "completion": {
+        "required": true,
+        "submit_required": false
+      },
+      "feedback": {
+        "timing": "none",
+        "allowed": []
+      },
+      "timeout": {
+        "limit_seconds": 180,
+        "on_timeout": "record_incomplete"
+      },
+      "accessibility": {
+        "keyboard_operable": true,
+        "screen_reader_label": "Reading passage"
+      },
+      "evidence_requirements": [
+        "text_revisited",
+        "activity_completed"
+      ],
+      "attempt_id": "attempt-act-read",
+      "pedagogical_intent": "transfer",
+      "output_contract": {
+        "kind": "none",
+        "artifact_type": null
+      },
+      "relationships": {
+        "revision_of": null,
+        "feedback_ref": null,
+        "source_output_ref": null,
+        "prior_evidence_refs": []
+      }
+    },
+    {
+      "activity_id": "act-select",
+      "type": "SELECT",
+      "phase_id": "phase-transfer",
+      "skill_refs": [
+        "reading.tfng.semantic-relation"
+      ],
+      "prompt": "Claim: Participants considered rail travel too expensive.",
+      "resource_refs": [
+        "res-passage"
+      ],
+      "config": {
+        "selection_mode": "one",
+        "options": [
+          {
+            "option_id": "true",
+            "label": "True"
+          },
+          {
+            "option_id": "false",
+            "label": "False"
+          },
+          {
+            "option_id": "not-given",
+            "label": "Not Given"
+          }
+        ],
+        "min_selections": 1,
+        "max_selections": 1
+      },
+      "completion": {
+        "required": true,
+        "submit_required": true
+      },
+      "feedback": {
+        "timing": "after_submission",
+        "allowed": [
+          "correctness",
+          "explanation",
+          "retry_invitation"
+        ]
+      },
+      "timeout": {
+        "limit_seconds": 120,
+        "on_timeout": "submit_current"
+      },
+      "accessibility": {
+        "keyboard_operable": true,
+        "screen_reader_label": "True False Not Given choices"
+      },
+      "evidence_requirements": [
+        "answer_selected",
+        "answer_submitted"
+      ],
+      "attempt_id": "attempt-act-select",
+      "pedagogical_intent": "transfer",
+      "output_contract": {
+        "kind": "selection",
+        "artifact_type": null
+      },
+      "relationships": {
+        "revision_of": null,
+        "feedback_ref": null,
+        "source_output_ref": null,
+        "prior_evidence_refs": []
+      }
+    },
+    {
+      "activity_id": "act-evidence",
+      "type": "EVIDENCE_SELECT",
+      "phase_id": "phase-transfer",
+      "skill_refs": [
+        "reading.tfng.semantic-relation"
+      ],
+      "prompt": "Select the passage span that supports your classification, or submit an empty selection when support is absent.",
+      "resource_refs": [
+        "res-passage"
+      ],
+      "config": {
+        "min_spans": 0,
+        "max_spans": 2,
+        "allow_revision": true,
+        "preserve_raw_selection": true,
+        "artifact_type": "highlighted_evidence"
+      },
+      "completion": {
+        "required": true,
+        "submit_required": true
+      },
+      "feedback": {
+        "timing": "after_activity",
+        "allowed": [
+          "comparison"
+        ]
+      },
+      "timeout": {
+        "limit_seconds": 180,
+        "on_timeout": "record_incomplete"
+      },
+      "accessibility": {
+        "keyboard_operable": true,
+        "screen_reader_label": "Evidence span selector"
+      },
+      "evidence_requirements": [
+        "evidence_selected",
+        "activity_completed"
+      ],
+      "attempt_id": "attempt-act-evidence",
+      "pedagogical_intent": "transfer",
+      "output_contract": {
+        "kind": "evidence_spans",
+        "artifact_type": "highlighted_evidence"
+      },
+      "relationships": {
+        "revision_of": null,
+        "feedback_ref": null,
+        "source_output_ref": null,
+        "prior_evidence_refs": []
+      }
+    }
+  ],
+  "feedback_policy": {
+    "mode": "training",
+    "allow_hints": false,
+    "allow_retry": true,
+    "correction_timing": "after_submission"
+  },
+  "completion_policy": {
+    "required_activity_ids": [
+      "act-read",
+      "act-select",
+      "act-evidence"
+    ],
+    "allow_partial_result": true,
+    "coach_checkpoint": null
+  },
+  "evidence_requirements": {
+    "required_event_types": [
+      "session_started",
+      "activity_started",
+      "text_revisited",
+      "answer_submitted",
+      "evidence_selected",
+      "activity_completed",
+      "session_completed"
+    ],
+    "artifact_types": [
+      "highlighted_evidence"
+    ]
+  },
+  "run_id": "run-pkg-reading-tfng-001",
+  "segment_id": "segment-pkg-reading-tfng-001",
+  "protected_evaluation_ref": {
+    "evaluation_id": "eval-reading-001",
+    "content_hash": "sha256:5971bb6e429fd080edc698cad83d913f353f12d657419b7d96b4a10132766ea5"
+  },
+  "continuation": null
 }

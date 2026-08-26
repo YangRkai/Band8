@@ -4,14 +4,14 @@
   "title": "Band8 Session Result 0.1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "protocol_version", "session_id", "package_id", "started_at", "completed_at", "effective_duration_seconds", "activities_completed", "objective_results", "user_artifacts", "corrections", "retries", "self_assessments", "abandonment", "reinforcement_events", "evidence_refs", "source_event_ids"],
+  "required": ["schema_version", "protocol_version", "session_id", "run_id", "segment_id", "package_id", "started_at", "completed_at", "effective_duration_seconds", "activities_completed", "objective_results", "user_artifacts", "corrections", "retries", "self_assessments", "abandonment", "reinforcement_events", "evidence_refs", "source_event_ids"],
   "properties": {
     "schema_version": {"const": "0.1.0"}, "protocol_version": {"const": "0.1.0"},
-    "session_id": {"$ref": "#/$defs/id"}, "package_id": {"$ref": "#/$defs/id"},
+    "session_id": {"$ref": "#/$defs/id"}, "run_id": {"$ref": "#/$defs/id"}, "segment_id": {"$ref": "#/$defs/id"}, "package_id": {"$ref": "#/$defs/id"},
     "started_at": {"type": "string", "format": "date-time"}, "completed_at": {"type": "string", "format": "date-time"},
     "effective_duration_seconds": {"type": "integer", "minimum": 0, "maximum": 43200},
     "activities_completed": {"$ref": "#/$defs/ids"},
-    "objective_results": {"type": "array", "maxItems": 32, "items": {"type": "object", "additionalProperties": false, "required": ["result_id", "performance_class", "outcome", "evidence_refs"], "properties": {"result_id": {"$ref": "#/$defs/id"}, "performance_class": {"enum": ["training_performance", "transfer_performance", "assessment_performance"]}, "outcome": {"enum": ["successful", "partial", "unsuccessful", "not_observed"]}, "evidence_refs": {"$ref": "#/$defs/nonempty_ids"}}}},
+    "objective_results": {"type": "array", "maxItems": 32, "items": {"type": "object", "additionalProperties": false, "required": ["result_id", "activity_id", "performance_class", "outcome", "evidence_refs"], "properties": {"result_id": {"$ref": "#/$defs/id"}, "activity_id": {"$ref": "#/$defs/id"}, "performance_class": {"enum": ["training_performance", "transfer_performance", "assessment_performance"]}, "outcome": {"enum": ["successful", "partial", "unsuccessful", "not_observed"]}, "evidence_refs": {"$ref": "#/$defs/nonempty_ids"}}}},
     "user_artifacts": {"$ref": "#/$defs/ids"}, "corrections": {"$ref": "#/$defs/ids"}, "retries": {"$ref": "#/$defs/ids"}, "self_assessments": {"$ref": "#/$defs/ids"},
     "abandonment": {"type": ["object", "null"], "maxProperties": 8},
     "reinforcement_events": {"$ref": "#/$defs/ids"}, "evidence_refs": {"$ref": "#/$defs/nonempty_ids"}, "source_event_ids": {"$ref": "#/$defs/nonempty_ids"}

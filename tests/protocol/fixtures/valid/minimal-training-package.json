@@ -8,9 +8,15 @@
     "producer_version": "gpt-5"
   },
   "contract_versions": {
+    "b8tp_version": "0.1.0",
+    "package_schema_version": "0.1.0",
+    "evidence_contract_version": "0.1.0",
+    "reinforcement_contract_version": "0.1.0",
     "pedagogy_version": "0.1.0",
     "coach_contract_version": "0.1.0",
-    "skill_taxonomy_version": "0.1.0"
+    "skill_taxonomy_version": "0.1.0",
+    "runtime_version": "0.1.0",
+    "validator_version": "0.1.0"
   },
   "learner_goal": {
     "overall_target": 8.0,
@@ -31,21 +37,37 @@
     "summary": "Establish one contrastive retrieval observation.",
     "evidence_refs": []
   },
-  "target_skills": ["reading.tfng.semantic-relation"],
+  "target_skills": [
+    "reading.tfng.semantic-relation"
+  ],
   "training_hypotheses": [],
   "resources": [
     {
       "resource_id": "res-question",
       "resource_type": "text",
       "content_format": "plain_text",
-      "content": "The passage provides no information about the claim."
+      "content": "The passage provides no information about the claim.",
+      "provenance": {
+        "origin_type": "generated",
+        "source_identifier": null,
+        "generator": {
+          "producer": "Codex",
+          "producer_version": "gpt-5"
+        },
+        "content_hash": "sha256:7f5692b326d9dc7f3de57d5d7674123e4163d2182a18dbb1bd0465daf7a7da59",
+        "license": null,
+        "attribution": null,
+        "redistribution_status": "cleared"
+      }
     }
   ],
   "phases": [
     {
       "phase_id": "phase-retrieval",
       "kind": "retrieval",
-      "activity_ids": ["act-1"]
+      "activity_ids": [
+        "act-1"
+      ]
     }
   ],
   "activities": [
@@ -53,29 +75,62 @@
       "activity_id": "act-1",
       "type": "SELECT",
       "phase_id": "phase-retrieval",
-      "skill_refs": ["reading.tfng.semantic-relation"],
+      "skill_refs": [
+        "reading.tfng.semantic-relation"
+      ],
       "prompt": "Choose the correct relation.",
-      "resource_refs": ["res-question"],
+      "resource_refs": [
+        "res-question"
+      ],
       "config": {
         "selection_mode": "one",
         "options": [
-          {"option_id": "false", "label": "False"},
-          {"option_id": "not-given", "label": "Not Given"}
+          {
+            "option_id": "false",
+            "label": "False"
+          },
+          {
+            "option_id": "not-given",
+            "label": "Not Given"
+          }
         ],
         "min_selections": 1,
         "max_selections": 1
       },
-      "completion": {"required": true, "submit_required": true},
+      "completion": {
+        "required": true,
+        "submit_required": true
+      },
       "feedback": {
         "timing": "after_submission",
-        "allowed": ["correctness", "explanation"]
+        "allowed": [
+          "correctness",
+          "explanation"
+        ]
       },
-      "timeout": {"limit_seconds": 120, "on_timeout": "record_incomplete"},
+      "timeout": {
+        "limit_seconds": 120,
+        "on_timeout": "record_incomplete"
+      },
       "accessibility": {
         "keyboard_operable": true,
         "screen_reader_label": "False or Not Given selection"
       },
-      "evidence_requirements": ["answer_submitted"]
+      "evidence_requirements": [
+        "answer_submitted"
+      ],
+      "attempt_id": "attempt-act-1",
+      "pedagogical_intent": "retrieval",
+      "output_contract": {
+        "kind": "selection",
+        "artifact_type": null
+      },
+      "relationships": {
+        "revision_of": null,
+        "feedback_ref": null,
+        "source_output_ref": null,
+        "prior_evidence_refs": []
+      }
     }
   ],
   "feedback_policy": {
@@ -85,10 +140,12 @@
     "correction_timing": "after_submission"
   },
   "completion_policy": {
-    "required_activity_ids": ["act-1"],
-    "allow_partial_result": true
+    "required_activity_ids": [
+      "act-1"
+    ],
+    "allow_partial_result": true,
+    "coach_checkpoint": null
   },
-  "reinforcement_hints": {"candidate_types": []},
   "evidence_requirements": {
     "required_event_types": [
       "session_started",
@@ -98,5 +155,12 @@
       "session_completed"
     ],
     "artifact_types": []
-  }
+  },
+  "run_id": "run-pkg-minimal-001",
+  "segment_id": "segment-pkg-minimal-001",
+  "protected_evaluation_ref": {
+    "evaluation_id": "eval-minimal-001",
+    "content_hash": "sha256:2320528de83bb659fd96d156968e095a64d7b109b8261d5f315ae4b3cdcf7cae"
+  },
+  "continuation": null
 }

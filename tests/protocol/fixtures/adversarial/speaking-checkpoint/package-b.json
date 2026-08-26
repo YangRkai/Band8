@@ -1,0 +1,246 @@
+{
+  "schema_version": "0.1.0",
+  "protocol_version": "0.1.0",
+  "package_id": "pkg-speaking-checkpoint-b",
+  "created_at": "2026-08-26T00:00:00Z",
+  "generator": {
+    "producer": "Codex",
+    "producer_version": "gpt-5"
+  },
+  "contract_versions": {
+    "b8tp_version": "0.1.0",
+    "package_schema_version": "0.1.0",
+    "evidence_contract_version": "0.1.0",
+    "reinforcement_contract_version": "0.1.0",
+    "pedagogy_version": "0.1.0",
+    "coach_contract_version": "0.1.0",
+    "skill_taxonomy_version": "0.1.0",
+    "runtime_version": "0.1.0",
+    "validator_version": "0.1.0"
+  },
+  "learner_goal": {
+    "overall_target": 8.0,
+    "section_minimums": {
+      "listening": 7.5,
+      "reading": 7.5,
+      "writing": 7.5,
+      "speaking": 7.5
+    }
+  },
+  "session_intent": {
+    "mode": "training",
+    "objective": "Produce a speaking attempt before Coach feedback.",
+    "evidence_class": "training_performance"
+  },
+  "estimated_duration_minutes": 5,
+  "training_rationale": {
+    "summary": "Establish one contrastive retrieval observation.",
+    "evidence_refs": []
+  },
+  "target_skills": [
+    "speaking.fluency-coherence"
+  ],
+  "training_hypotheses": [],
+  "resources": [
+    {
+      "resource_id": "res-speaking-feedback",
+      "resource_type": "feedback",
+      "content_format": "plain_text",
+      "content": "Coach feedback grounded in artifact-speaking-original-001.",
+      "provenance": {
+        "origin_type": "generated",
+        "source_identifier": null,
+        "generator": {
+          "producer": "Codex",
+          "producer_version": "gpt-5"
+        },
+        "content_hash": "sha256:0cc43d56a9be39a7c00422d0e5baafd97b2af03c202833c68e4d1b18cba654d9",
+        "license": null,
+        "attribution": null,
+        "redistribution_status": "cleared"
+      }
+    },
+    {
+      "resource_id": "res-speaking-transfer",
+      "resource_type": "text",
+      "content_format": "plain_text",
+      "content": "Describe an unfamiliar public service.",
+      "provenance": {
+        "origin_type": "generated",
+        "source_identifier": null,
+        "generator": {
+          "producer": "Codex",
+          "producer_version": "gpt-5"
+        },
+        "content_hash": "sha256:51d8cca6027ef4e0a841036229c812f0ec2e2f9a43d3babc64428910aa10daa2",
+        "license": null,
+        "attribution": null,
+        "redistribution_status": "cleared"
+      }
+    }
+  ],
+  "phases": [
+    {
+      "phase_id": "phase-speaking-correction",
+      "kind": "correction",
+      "activity_ids": [
+        "act-speaking-revision"
+      ]
+    },
+    {
+      "phase_id": "phase-speaking-transfer",
+      "kind": "transfer",
+      "activity_ids": [
+        "act-speaking-transfer"
+      ]
+    }
+  ],
+  "activities": [
+    {
+      "activity_id": "act-speaking-revision",
+      "type": "SPEAK_RECORD",
+      "phase_id": "phase-speaking-correction",
+      "skill_refs": [
+        "speaking.fluency-coherence"
+      ],
+      "prompt": "Choose the correct relation.",
+      "resource_refs": [
+        "res-speaking-feedback"
+      ],
+      "config": {
+        "min_seconds": 30,
+        "max_seconds": 180,
+        "max_takes": 1,
+        "artifact_type": "speaking_audio"
+      },
+      "completion": {
+        "required": true,
+        "submit_required": true
+      },
+      "feedback": {
+        "timing": "none",
+        "allowed": []
+      },
+      "timeout": {
+        "limit_seconds": 120,
+        "on_timeout": "record_incomplete"
+      },
+      "accessibility": {
+        "keyboard_operable": true,
+        "screen_reader_label": "False or Not Given selection"
+      },
+      "evidence_requirements": [
+        "correction_started",
+        "speaking_recording_created",
+        "artifact_created"
+      ],
+      "attempt_id": "attempt-speaking-revision",
+      "pedagogical_intent": "correction",
+      "output_contract": {
+        "kind": "audio",
+        "artifact_type": "speaking_audio"
+      },
+      "relationships": {
+        "revision_of": "attempt-speaking-original",
+        "feedback_ref": "res-speaking-feedback",
+        "source_output_ref": "artifact-speaking-original-001",
+        "prior_evidence_refs": [
+          "artifact-speaking-original-001"
+        ]
+      }
+    },
+    {
+      "activity_id": "act-speaking-transfer",
+      "type": "SPEAK_RECORD",
+      "phase_id": "phase-speaking-transfer",
+      "skill_refs": [
+        "speaking.fluency-coherence"
+      ],
+      "prompt": "Choose the correct relation.",
+      "resource_refs": [
+        "res-speaking-transfer"
+      ],
+      "config": {
+        "min_seconds": 30,
+        "max_seconds": 180,
+        "max_takes": 1,
+        "artifact_type": "speaking_audio"
+      },
+      "completion": {
+        "required": true,
+        "submit_required": true
+      },
+      "feedback": {
+        "timing": "none",
+        "allowed": []
+      },
+      "timeout": {
+        "limit_seconds": 120,
+        "on_timeout": "record_incomplete"
+      },
+      "accessibility": {
+        "keyboard_operable": true,
+        "screen_reader_label": "False or Not Given selection"
+      },
+      "evidence_requirements": [
+        "speaking_recording_created",
+        "artifact_created"
+      ],
+      "attempt_id": "attempt-speaking-transfer",
+      "pedagogical_intent": "transfer",
+      "output_contract": {
+        "kind": "audio",
+        "artifact_type": "speaking_audio"
+      },
+      "relationships": {
+        "revision_of": null,
+        "feedback_ref": null,
+        "source_output_ref": null,
+        "prior_evidence_refs": [
+          "artifact-speaking-original-001"
+        ]
+      }
+    }
+  ],
+  "feedback_policy": {
+    "mode": "training",
+    "allow_hints": false,
+    "allow_retry": true,
+    "correction_timing": "after_submission"
+  },
+  "completion_policy": {
+    "required_activity_ids": [
+      "act-speaking-revision",
+      "act-speaking-transfer"
+    ],
+    "allow_partial_result": false,
+    "coach_checkpoint": null
+  },
+  "evidence_requirements": {
+    "required_event_types": [
+      "session_started",
+      "activity_started",
+      "speaking_recording_created",
+      "artifact_created",
+      "activity_completed",
+      "session_completed"
+    ],
+    "artifact_types": [
+      "speaking_audio"
+    ]
+  },
+  "run_id": "run-speaking-checkpoint-001",
+  "segment_id": "segment-speaking-002",
+  "protected_evaluation_ref": null,
+  "continuation": {
+    "continuation_of": "pkg-speaking-checkpoint-a",
+    "prior_segment_id": "segment-speaking-001",
+    "checkpoint_id": "checkpoint-speaking-001",
+    "required_evidence_refs": [
+      "artifact-speaking-original-001"
+    ]
+  },
+  "available_evidence_refs": [
+    "artifact-speaking-original-001"
+  ]
+}

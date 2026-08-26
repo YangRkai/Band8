@@ -1,21 +1,33 @@
 # Protocol Versioning
 
-## Versions
+## Recorded contract set
 
-B8TP, schemas, pedagogy, Coach contract, skill taxonomy, reinforcement contract, and evidence contract use semantic versions. Phase 0 freezes all at `0.1.0`.
+Every accepted package records:
 
-- Patch: clarification or stricter validation that does not change valid document meaning.
-- Minor: additive backward-compatible field, primitive, event, or skill.
-- Major: incompatible structure, meaning, security policy, or lifecycle behavior.
+- B8TP version;
+- package schema version;
+- evidence contract version;
+- reinforcement contract version;
+- pedagogy version;
+- Coach contract version;
+- skill taxonomy version;
+- Runtime/interpreter version;
+- validator version.
+
+The immutable accepted package is stored with its segment, so events, artifacts, protected evaluation, checkpoints, and results resolve to the exact semantics that produced them.
 
 ## Compatibility
 
-V0.1 accepts only exact protocol and schema version `0.1.0`. Unknown versions are rejected deterministically. A future migration produces new records, records `migration_version`, preserves original bytes, and never silently rewrites evidence.
+V0.1 accepts the exact supported contract set `0.1.0`. Unknown major versions and unsupported combinations are rejected before acceptance. Patch versions may clarify or tighten validation only when they do not reinterpret an already valid historical record. Minor and major meaning changes require explicit support and recorded semantics.
 
-## Identity and replay
+Replay uses the recorded contract set when that interpreter remains supported. Otherwise replay returns `REPLAY_UNSUPPORTED`; it never silently applies current semantics.
 
-Package IDs, session IDs, event IDs, artifact IDs, hypothesis IDs, and review IDs are immutable. Duplicate package IDs are rejected. Accepted packages record all contract versions so a session can be replayed under the rules that produced it.
+## Identity and migration
 
-## Schema policy
+Package, session, run, segment, event, artifact, checkpoint, evaluation, result, hypothesis, review, reinforcement decision, and migration IDs are immutable.
 
-Schemas use JSON Schema Draft 2020-12, explicit required fields, bounded arrays and strings, and closed object boundaries. Semantic validation adds reference integrity, event order, assessment restrictions, path safety, dangerous-content rejection, and collision handling.
+Migration creates an explicit migration record containing source identity/hash, from/to contract sets, new record identity, migration version, and `original_preserved = true`. Historical raw evidence and bytes remain unchanged. Unsupported history may remain exportable even when it cannot be replayed.
+
+## Scope
+
+Phase 0.6 defines the minimum record and rejection semantics. It does not implement a general migration framework or long-term compatibility matrix.

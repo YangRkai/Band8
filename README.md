@@ -11,4 +11,4 @@ Core boundary:
 
 Current stage:
 
-Phase 0 complete — Protocol & Architecture Freeze.
+Phase 0.6 complete — Protocol Closure. Phase 1 has not started.
