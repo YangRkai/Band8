@@ -4,7 +4,7 @@ import { isAbsolute, join, resolve } from "node:path";
 
 export interface RuntimeWorkspace {
   root: string;
-  paths: Record<"packages" | "protected" | "sessions" | "artifacts" | "registry", string>;
+  paths: Record<"packages" | "protected" | "sessions" | "artifacts" | "registry" | "coach", string>;
 }
 
 export function initializeWorkspace(path: string): RuntimeWorkspace {
@@ -19,6 +19,7 @@ export function initializeWorkspace(path: string): RuntimeWorkspace {
     sessions: join(root, "sessions"),
     artifacts: join(root, "artifacts"),
     registry: join(root, "registry"),
+    coach: join(root, "coach"),
   };
   for (const directory of Object.values(paths)) mkdirSync(directory, { recursive: true });
   return { root, paths };

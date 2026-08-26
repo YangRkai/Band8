@@ -28,6 +28,10 @@ export class AppendOnlyEventStore {
     private readonly workspace: RuntimeWorkspace,
     private readonly validator: ProtocolValidator,
     private readonly idFactory: () => string,
+    private readonly artifactValidation?: () => {
+      artifacts: ReadonlyMap<string, Document>;
+      artifactRoot: string;
+    },
   ) {}
 
   append(context: EventContext, packageDocument: Document, details: EventDetails): Document {
@@ -49,9 +53,11 @@ export class AppendOnlyEventStore {
     };
     const candidate = [...existing, event];
     const terminal = new Set(["session_completed", "session_abandoned", "session_quarantined", "coach_checkpoint_reached"]);
+    const artifactOptions = this.artifactValidation?.();
     this.validator.validateEventStream(candidate, {
       packageDocument,
       mode: terminal.has(details.eventType) ? "complete" : "prefix",
+      ...(artifactOptions ?? {}),
     });
     const path = this.path(context.sessionId);
     mkdirSync(dirname(path), { recursive: true });

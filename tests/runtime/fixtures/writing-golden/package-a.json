@@ -1,0 +1,265 @@
+{
+  "schema_version": "0.1.0",
+  "protocol_version": "0.1.0",
+  "package_id": "pkg-writing-golden-a",
+  "created_at": "2026-08-26T16:00:00Z",
+  "generator": {
+    "producer": "band8-synthetic-fixture",
+    "producer_version": "manual-smoke-1"
+  },
+  "contract_versions": {
+    "b8tp_version": "0.1.0",
+    "package_schema_version": "0.1.0",
+    "evidence_contract_version": "0.1.0",
+    "reinforcement_contract_version": "0.1.0",
+    "pedagogy_version": "0.1.0",
+    "coach_contract_version": "0.1.0",
+    "skill_taxonomy_version": "0.1.0",
+    "runtime_version": "0.1.0",
+    "validator_version": "0.1.0"
+  },
+  "learner_goal": {
+    "overall_target": 8,
+    "section_minimums": {
+      "listening": 7.5,
+      "reading": 7.5,
+      "writing": 7.5,
+      "speaking": 7.5
+    }
+  },
+  "session_intent": {
+    "mode": "training",
+    "objective": "Generate an initial paragraph before external Coach feedback.",
+    "evidence_class": "training_performance"
+  },
+  "estimated_duration_minutes": 5,
+  "training_rationale": {
+    "summary": "Synthetic Writing evidence for the external Coach vertical loop.",
+    "evidence_refs": []
+  },
+  "target_skills": [
+    "writing.task-response"
+  ],
+  "training_hypotheses": [],
+  "resources": [
+    {
+      "resource_id": "resource-writing-golden-initial",
+      "resource_type": "text",
+      "content_format": "plain_text",
+      "content": "Some cities are considering free evening study centres in public libraries. Explain one benefit of this policy and one challenge cities would need to address.",
+      "provenance": {
+        "origin_type": "generated",
+        "source_identifier": null,
+        "generator": {
+          "producer": "band8-synthetic-fixture",
+          "producer_version": "manual-smoke-1"
+        },
+        "content_hash": "sha256:91e766ad0e6e078d33cf70b112e53b1641c6252746928e9951eefc910535f037",
+        "license": null,
+        "attribution": null,
+        "redistribution_status": "cleared"
+      }
+    }
+  ],
+  "phases": [
+    {
+      "phase_id": "phase-writing-golden-instruction",
+      "kind": "instruction",
+      "activity_ids": [
+        "activity-writing-golden-instruction"
+      ]
+    },
+    {
+      "phase_id": "phase-writing-golden-generation",
+      "kind": "generation",
+      "activity_ids": [
+        "activity-writing-golden-prompt",
+        "activity-writing-golden-draft"
+      ]
+    }
+  ],
+  "activities": [
+    {
+      "activity_id": "activity-writing-golden-instruction",
+      "type": "INSTRUCTION",
+      "phase_id": "phase-writing-golden-instruction",
+      "skill_refs": [
+        "writing.task-response"
+      ],
+      "prompt": "Write one focused paragraph that addresses both parts of the generated prompt.",
+      "resource_refs": [],
+      "config": {
+        "acknowledge_required": true
+      },
+      "completion": {
+        "required": true,
+        "submit_required": false
+      },
+      "feedback": {
+        "timing": "none",
+        "allowed": []
+      },
+      "timeout": {
+        "limit_seconds": 600,
+        "on_timeout": "record_incomplete"
+      },
+      "accessibility": {
+        "keyboard_operable": true,
+        "screen_reader_label": "Write one focused paragraph that addresses both parts of the generated prompt."
+      },
+      "evidence_requirements": [
+        "activity_started",
+        "activity_completed"
+      ],
+      "attempt_id": "attempt-writing-golden-instruction",
+      "pedagogical_intent": "instruction",
+      "output_contract": {
+        "kind": "none",
+        "artifact_type": null
+      },
+      "relationships": {
+        "revision_of": null,
+        "feedback_ref": null,
+        "source_output_ref": null,
+        "prior_evidence_refs": []
+      }
+    },
+    {
+      "activity_id": "activity-writing-golden-prompt",
+      "type": "PRESENT_TEXT",
+      "phase_id": "phase-writing-golden-generation",
+      "skill_refs": [
+        "writing.task-response"
+      ],
+      "prompt": "Read the generated Writing prompt.",
+      "resource_refs": [
+        "resource-writing-golden-initial"
+      ],
+      "config": {
+        "display_mode": "continuous"
+      },
+      "completion": {
+        "required": true,
+        "submit_required": false
+      },
+      "feedback": {
+        "timing": "none",
+        "allowed": []
+      },
+      "timeout": {
+        "limit_seconds": 600,
+        "on_timeout": "record_incomplete"
+      },
+      "accessibility": {
+        "keyboard_operable": true,
+        "screen_reader_label": "Read the generated Writing prompt."
+      },
+      "evidence_requirements": [
+        "activity_started",
+        "activity_completed"
+      ],
+      "attempt_id": "attempt-writing-golden-prompt",
+      "pedagogical_intent": "generation",
+      "output_contract": {
+        "kind": "none",
+        "artifact_type": null
+      },
+      "relationships": {
+        "revision_of": null,
+        "feedback_ref": null,
+        "source_output_ref": null,
+        "prior_evidence_refs": []
+      }
+    },
+    {
+      "activity_id": "activity-writing-golden-draft",
+      "type": "TEXT_RESPONSE",
+      "phase_id": "phase-writing-golden-generation",
+      "skill_refs": [
+        "writing.task-response"
+      ],
+      "prompt": "Submit your initial paragraph.",
+      "resource_refs": [
+        "resource-writing-golden-initial"
+      ],
+      "config": {
+        "response_kind": "long",
+        "min_characters": 100,
+        "max_characters": 1800,
+        "artifact_type": "essay"
+      },
+      "completion": {
+        "required": true,
+        "submit_required": true
+      },
+      "feedback": {
+        "timing": "none",
+        "allowed": []
+      },
+      "timeout": {
+        "limit_seconds": 600,
+        "on_timeout": "record_incomplete"
+      },
+      "accessibility": {
+        "keyboard_operable": true,
+        "screen_reader_label": "Submit your initial paragraph."
+      },
+      "evidence_requirements": [
+        "activity_started",
+        "answer_submitted",
+        "artifact_created",
+        "activity_completed"
+      ],
+      "attempt_id": "attempt-writing-golden-draft",
+      "pedagogical_intent": "generation",
+      "output_contract": {
+        "kind": "text",
+        "artifact_type": "essay"
+      },
+      "relationships": {
+        "revision_of": null,
+        "feedback_ref": null,
+        "source_output_ref": null,
+        "prior_evidence_refs": []
+      }
+    }
+  ],
+  "feedback_policy": {
+    "mode": "training",
+    "allow_hints": false,
+    "allow_retry": true,
+    "correction_timing": "after_submission"
+  },
+  "completion_policy": {
+    "required_activity_ids": [
+      "activity-writing-golden-instruction",
+      "activity-writing-golden-prompt",
+      "activity-writing-golden-draft"
+    ],
+    "allow_partial_result": false,
+    "coach_checkpoint": {
+      "checkpoint_id": "checkpoint-writing-golden",
+      "checkpoint_reason": "writing_feedback",
+      "source_activity_ids": [
+        "activity-writing-golden-draft"
+      ]
+    }
+  },
+  "evidence_requirements": {
+    "required_event_types": [
+      "session_started",
+      "activity_started",
+      "activity_completed",
+      "answer_submitted",
+      "artifact_created",
+      "coach_checkpoint_reached"
+    ],
+    "artifact_types": [
+      "essay"
+    ]
+  },
+  "run_id": "run-writing-golden",
+  "segment_id": "segment-writing-golden-a",
+  "protected_evaluation_ref": null,
+  "continuation": null
+}

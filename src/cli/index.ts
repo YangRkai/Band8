@@ -14,13 +14,14 @@ interface CliDependencies {
   write?: (value: string) => void;
   read?: (prompt: string) => Promise<string>;
   eventIdFactory?: () => string;
+  artifactIdFactory?: () => string;
   now?: () => string;
 }
 
 interface ParsedArguments {
   workspace: string;
   command: string;
-  target: string;
+  targets: string[];
   protectedPath?: string;
   sessionId?: string;
 }
@@ -39,15 +40,17 @@ function parseArguments(argumentsList: string[]): ParsedArguments {
   const workspace = takeOption(remaining, "--workspace");
   const protectedPath = takeOption(remaining, "--protected");
   const sessionId = takeOption(remaining, "--session");
-  const [command, target, ...extras] = remaining;
-  if (workspace === undefined || command === undefined || target === undefined || extras.length > 0) {
-    throw new Error("usage: band8 --workspace <path> <validate|import|run> <target> [--protected <path>] [--session <id>]");
+  const [command, ...targets] = remaining;
+  if (workspace === undefined || command === undefined || targets.length === 0) {
+    throw new Error("usage: band8 --workspace <path> <validate|import|run|checkpoint|continue> <target...> [--protected <path>] [--session <id>]");
   }
-  if (!["validate", "import", "run"].includes(command)) throw new Error(`unknown command: ${command}`);
+  if (!["validate", "import", "run", "checkpoint", "continue"].includes(command)) throw new Error(`unknown command: ${command}`);
+  const expectedTargets = command === "continue" ? 2 : 1;
+  if (targets.length !== expectedTargets) throw new Error(`${command} requires ${expectedTargets} target argument(s)`);
   return {
     workspace: resolve(workspace),
     command,
-    target,
+    targets,
     ...(protectedPath === undefined ? {} : { protectedPath: resolve(protectedPath) }),
     ...(sessionId === undefined ? {} : { sessionId }),
   };
@@ -68,7 +71,7 @@ export async function executeCli(argumentsList: string[], dependencies: CliDepen
   const write = dependencies.write ?? ((value: string) => process.stdout.write(`${value}\n`));
   const read = dependencies.read ?? terminalRead;
   if (parsed.command === "validate") {
-    const packageDocument = parseJsonStrict(readFileSync(resolve(parsed.target), "utf8"));
+    const packageDocument = parseJsonStrict(readFileSync(resolve(parsed.targets[0]!), "utf8"));
     const validator = createProtocolValidator(repositoryRoot);
     validator.validatePackage(packageDocument);
     if (parsed.protectedPath !== undefined) {
@@ -83,11 +86,12 @@ export async function executeCli(argumentsList: string[], dependencies: CliDepen
     repositoryRoot,
     workspacePath: parsed.workspace,
     ...(dependencies.eventIdFactory === undefined ? {} : { eventIdFactory: dependencies.eventIdFactory }),
+    ...(dependencies.artifactIdFactory === undefined ? {} : { artifactIdFactory: dependencies.artifactIdFactory }),
     ...(dependencies.now === undefined ? {} : { now: dependencies.now }),
   };
   const runtime = Band8Runtime.open(runtimeOptions);
   if (parsed.command === "import") {
-    const packageText = readFileSync(resolve(parsed.target), "utf8");
+    const packageText = readFileSync(resolve(parsed.targets[0]!), "utf8");
     const protectedText = parsed.protectedPath === undefined ? undefined : readFileSync(parsed.protectedPath, "utf8");
     const result = protectedText === undefined
       ? runtime.importPackage(packageText)
@@ -96,8 +100,20 @@ export async function executeCli(argumentsList: string[], dependencies: CliDepen
     return 0;
   }
 
+  if (parsed.command === "checkpoint") {
+    const exported = runtime.exportCheckpoint(parsed.targets[0]!);
+    write(`DATA_ONLY ${exported.bundlePath}`);
+    return 0;
+  }
+
+  if (parsed.command === "continue") {
+    const result = runtime.attachContinuation(parsed.targets[0]!, readFileSync(resolve(parsed.targets[1]!), "utf8"));
+    write(`${result.status} ${result.packageId} ${result.sessionId}`);
+    return 0;
+  }
+
   const sessionId = parsed.sessionId ?? `session-${randomUUID()}`;
-  runtime.createSession(parsed.target, sessionId);
+  runtime.createSession(parsed.targets[0]!, sessionId);
   runtime.startSession(sessionId);
   while (runtime.getSession(sessionId).state === "RUNNING") {
     const activity = runtime.currentActivity(sessionId);
@@ -105,10 +121,16 @@ export async function executeCli(argumentsList: string[], dependencies: CliDepen
     if (activity.type === "SELECT") {
       const answer = await read("Select option ID(s), comma-separated: ");
       runtime.completeCurrentActivity(sessionId, { optionIds: answer.split(",").map((item) => item.trim()).filter(Boolean) });
+    } else if (activity.type === "TEXT_RESPONSE") {
+      runtime.completeCurrentActivity(sessionId, { text: await read("Enter text response: ") });
     } else {
       await read("Press Enter to continue: ");
       runtime.completeCurrentActivity(sessionId);
     }
+  }
+  if (runtime.getSession(sessionId).state === "AWAITING_COACH") {
+    write(`AWAITING_COACH ${sessionId}`);
+    return 0;
   }
   const result = runtime.rebuildResult(sessionId);
   write(`COMPLETED ${sessionId}`);

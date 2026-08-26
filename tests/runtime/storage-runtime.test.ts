@@ -36,6 +36,7 @@ describe("workspace and package identity", () => {
     const workspace = initializeWorkspace(temporaryWorkspace());
     expect(Object.keys(workspace.paths).sort()).toEqual([
       "artifacts",
+      "coach",
       "packages",
       "protected",
       "registry",

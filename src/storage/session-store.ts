@@ -15,6 +15,9 @@ export interface SessionMetadata {
   state: SessionState;
   current_activity_index: number;
   completed_activity_ids: string[];
+  checkpoint_id?: string;
+  prior_session_id?: string;
+  continuation_session_id?: string;
   quarantine_reason?: string;
 }
 

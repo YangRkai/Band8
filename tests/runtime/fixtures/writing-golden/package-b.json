@@ -1,0 +1,314 @@
+{
+  "schema_version": "0.1.0",
+  "protocol_version": "0.1.0",
+  "package_id": "pkg-writing-golden-b",
+  "created_at": "2026-08-26T16:00:00Z",
+  "generator": {
+    "producer": "External Codex Coach",
+    "producer_version": "manual-smoke-1"
+  },
+  "contract_versions": {
+    "b8tp_version": "0.1.0",
+    "package_schema_version": "0.1.0",
+    "evidence_contract_version": "0.1.0",
+    "reinforcement_contract_version": "0.1.0",
+    "pedagogy_version": "0.1.0",
+    "coach_contract_version": "0.1.0",
+    "skill_taxonomy_version": "0.1.0",
+    "runtime_version": "0.1.0",
+    "validator_version": "0.1.0"
+  },
+  "learner_goal": {
+    "overall_target": 8,
+    "section_minimums": {
+      "listening": 7.5,
+      "reading": 7.5,
+      "writing": 7.5,
+      "speaking": 7.5
+    }
+  },
+  "session_intent": {
+    "mode": "training",
+    "objective": "Apply targeted feedback, rewrite, then transfer the skill to changed material.",
+    "evidence_class": "training_performance"
+  },
+  "estimated_duration_minutes": 5,
+  "training_rationale": {
+    "summary": "Synthetic Writing evidence for the external Coach vertical loop.",
+    "evidence_refs": [
+      "artifact-writing-golden-draft"
+    ]
+  },
+  "target_skills": [
+    "writing.task-response"
+  ],
+  "training_hypotheses": [
+    {
+      "hypothesis_id": "hypothesis-writing-golden-task-response",
+      "purpose": "test"
+    }
+  ],
+  "resources": [
+    {
+      "resource_id": "resource-writing-golden-feedback",
+      "resource_type": "feedback",
+      "content_format": "plain_text",
+      "content": "Your draft explains the access benefit clearly, but it repeats that benefit and does not address the requested implementation challenge. Keep the access point, then add one concrete scheduling or capacity challenge and explain its consequence. Rewrite the paragraph in your own words; do not copy a model answer.",
+      "provenance": {
+        "origin_type": "generated",
+        "source_identifier": null,
+        "generator": {
+          "producer": "External Codex Coach",
+          "producer_version": "manual-smoke-1"
+        },
+        "content_hash": "sha256:1e637d0b37d97561ff3c74d9cda45a8c82102f3ad0feab5a4c67ff395cd1efc1",
+        "license": null,
+        "attribution": null,
+        "redistribution_status": "cleared"
+      }
+    },
+    {
+      "resource_id": "resource-writing-golden-transfer",
+      "resource_type": "text",
+      "content_format": "plain_text",
+      "content": "Some towns are considering an online booking system for shared sports facilities. Explain one benefit of this policy and one challenge towns would need to address.",
+      "provenance": {
+        "origin_type": "generated",
+        "source_identifier": null,
+        "generator": {
+          "producer": "External Codex Coach",
+          "producer_version": "manual-smoke-1"
+        },
+        "content_hash": "sha256:a379664a86160a3e643a39d7d073effcd3c0a86f4918332b9b9c51c131c82e1f",
+        "license": null,
+        "attribution": null,
+        "redistribution_status": "cleared"
+      }
+    }
+  ],
+  "phases": [
+    {
+      "phase_id": "phase-writing-golden-correction",
+      "kind": "correction",
+      "activity_ids": [
+        "activity-writing-golden-feedback",
+        "activity-writing-golden-revision"
+      ]
+    },
+    {
+      "phase_id": "phase-writing-golden-transfer",
+      "kind": "transfer",
+      "activity_ids": [
+        "activity-writing-golden-transfer"
+      ]
+    }
+  ],
+  "activities": [
+    {
+      "activity_id": "activity-writing-golden-feedback",
+      "type": "PRESENT_TEXT",
+      "phase_id": "phase-writing-golden-correction",
+      "skill_refs": [
+        "writing.task-response"
+      ],
+      "prompt": "Read the targeted Coach feedback.",
+      "resource_refs": [
+        "resource-writing-golden-feedback"
+      ],
+      "config": {
+        "display_mode": "continuous"
+      },
+      "completion": {
+        "required": true,
+        "submit_required": false
+      },
+      "feedback": {
+        "timing": "none",
+        "allowed": []
+      },
+      "timeout": {
+        "limit_seconds": 600,
+        "on_timeout": "record_incomplete"
+      },
+      "accessibility": {
+        "keyboard_operable": true,
+        "screen_reader_label": "Read the targeted Coach feedback."
+      },
+      "evidence_requirements": [
+        "activity_started",
+        "activity_completed"
+      ],
+      "attempt_id": "attempt-writing-golden-feedback",
+      "pedagogical_intent": "correction",
+      "output_contract": {
+        "kind": "none",
+        "artifact_type": null
+      },
+      "relationships": {
+        "revision_of": null,
+        "feedback_ref": null,
+        "source_output_ref": null,
+        "prior_evidence_refs": [
+          "artifact-writing-golden-draft"
+        ]
+      }
+    },
+    {
+      "activity_id": "activity-writing-golden-revision",
+      "type": "TEXT_RESPONSE",
+      "phase_id": "phase-writing-golden-correction",
+      "skill_refs": [
+        "writing.task-response"
+      ],
+      "prompt": "Rewrite your paragraph using the targeted feedback.",
+      "resource_refs": [
+        "resource-writing-golden-feedback"
+      ],
+      "config": {
+        "response_kind": "long",
+        "min_characters": 100,
+        "max_characters": 1800,
+        "artifact_type": "rewrite"
+      },
+      "completion": {
+        "required": true,
+        "submit_required": true
+      },
+      "feedback": {
+        "timing": "none",
+        "allowed": []
+      },
+      "timeout": {
+        "limit_seconds": 600,
+        "on_timeout": "record_incomplete"
+      },
+      "accessibility": {
+        "keyboard_operable": true,
+        "screen_reader_label": "Rewrite your paragraph using the targeted feedback."
+      },
+      "evidence_requirements": [
+        "activity_started",
+        "correction_started",
+        "answer_submitted",
+        "writing_revision_created",
+        "artifact_created",
+        "correction_submitted",
+        "activity_completed"
+      ],
+      "attempt_id": "attempt-writing-golden-revision",
+      "pedagogical_intent": "correction",
+      "output_contract": {
+        "kind": "text",
+        "artifact_type": "rewrite"
+      },
+      "relationships": {
+        "revision_of": "attempt-writing-golden-draft",
+        "feedback_ref": "resource-writing-golden-feedback",
+        "source_output_ref": "artifact-writing-golden-draft",
+        "prior_evidence_refs": [
+          "artifact-writing-golden-draft"
+        ]
+      }
+    },
+    {
+      "activity_id": "activity-writing-golden-transfer",
+      "type": "TEXT_RESPONSE",
+      "phase_id": "phase-writing-golden-transfer",
+      "skill_refs": [
+        "writing.task-response"
+      ],
+      "prompt": "Answer the changed-material Writing prompt.",
+      "resource_refs": [
+        "resource-writing-golden-transfer"
+      ],
+      "config": {
+        "response_kind": "long",
+        "min_characters": 100,
+        "max_characters": 1800,
+        "artifact_type": "essay"
+      },
+      "completion": {
+        "required": true,
+        "submit_required": true
+      },
+      "feedback": {
+        "timing": "none",
+        "allowed": []
+      },
+      "timeout": {
+        "limit_seconds": 600,
+        "on_timeout": "record_incomplete"
+      },
+      "accessibility": {
+        "keyboard_operable": true,
+        "screen_reader_label": "Answer the changed-material Writing prompt."
+      },
+      "evidence_requirements": [
+        "activity_started",
+        "answer_submitted",
+        "artifact_created",
+        "activity_completed"
+      ],
+      "attempt_id": "attempt-writing-golden-transfer",
+      "pedagogical_intent": "transfer",
+      "output_contract": {
+        "kind": "text",
+        "artifact_type": "essay"
+      },
+      "relationships": {
+        "revision_of": null,
+        "feedback_ref": null,
+        "source_output_ref": null,
+        "prior_evidence_refs": [
+          "artifact-writing-golden-draft"
+        ]
+      }
+    }
+  ],
+  "feedback_policy": {
+    "mode": "training",
+    "allow_hints": false,
+    "allow_retry": true,
+    "correction_timing": "after_submission"
+  },
+  "completion_policy": {
+    "required_activity_ids": [
+      "activity-writing-golden-feedback",
+      "activity-writing-golden-revision",
+      "activity-writing-golden-transfer"
+    ],
+    "allow_partial_result": false,
+    "coach_checkpoint": null
+  },
+  "evidence_requirements": {
+    "required_event_types": [
+      "session_started",
+      "activity_started",
+      "activity_completed",
+      "answer_submitted",
+      "artifact_created",
+      "correction_started",
+      "writing_revision_created",
+      "correction_submitted",
+      "session_completed"
+    ],
+    "artifact_types": [
+      "rewrite",
+      "essay"
+    ]
+  },
+  "run_id": "run-writing-golden",
+  "segment_id": "segment-writing-golden-b",
+  "protected_evaluation_ref": null,
+  "continuation": {
+    "continuation_of": "pkg-writing-golden-a",
+    "prior_segment_id": "segment-writing-golden-a",
+    "checkpoint_id": "checkpoint-writing-golden",
+    "required_evidence_refs": [
+      "artifact-writing-golden-draft"
+    ]
+  },
+  "available_evidence_refs": [
+    "artifact-writing-golden-draft"
+  ]
+}

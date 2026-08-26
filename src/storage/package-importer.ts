@@ -86,6 +86,10 @@ export class PackageImporter {
     return record.protected_file === null ? undefined : parseJsonStrict(readFileSync(record.protected_file, "utf8")) as Document;
   }
 
+  record(packageId: string): ImportRecord {
+    return this.#record(packageId);
+  }
+
   #record(packageId: string): ImportRecord {
     const record = this.#readRegistry().packages[packageId];
     if (record === undefined) throw new Error(`package is not imported: ${packageId}`);

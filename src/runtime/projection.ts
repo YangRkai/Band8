@@ -24,6 +24,13 @@ export function projectLearnerActivity(packageDocument: Document, activity: Docu
       ? { acknowledge_required: activity.config.acknowledge_required }
       : activity.type === "PRESENT_TEXT"
         ? { display_mode: activity.config.display_mode }
+        : activity.type === "TEXT_RESPONSE"
+          ? {
+              response_kind: activity.config.response_kind,
+              min_characters: activity.config.min_characters,
+              max_characters: activity.config.max_characters,
+              artifact_type: activity.config.artifact_type,
+            }
         : {};
   return {
     activity_id: activity.activity_id,

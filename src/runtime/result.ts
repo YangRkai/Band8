@@ -24,7 +24,7 @@ function objectiveOutcome(submission: Document, entry: Document): "successful" |
 
 export function deriveSessionResult(
   packageDocument: Document,
-  protectedEvaluation: Document,
+  protectedEvaluation: Document | undefined,
   events: Document[],
 ): Document {
   const first = events[0];
@@ -34,7 +34,7 @@ export function deriveSessionResult(
   }
   const submissions = new Map<string, Document>();
   for (const event of events) if (event.event_type === "answer_submitted") submissions.set(event.activity_id, event);
-  const objectiveResults = protectedEvaluation.entries.map((entry: Document) => {
+  const objectiveResults = (protectedEvaluation?.entries ?? []).map((entry: Document) => {
     const submission = submissions.get(entry.activity_id);
     if (submission === undefined) throw new Error(`protected activity lacks submission: ${entry.activity_id}`);
     return {
@@ -45,9 +45,15 @@ export function deriveSessionResult(
       evidence_refs: [submission.event_id],
     };
   });
+  const userArtifacts = events
+    .filter((event) => event.event_type === "artifact_created")
+    .map((event) => event.payload.artifact_id as string);
+  const corrections = events
+    .filter((event) => event.event_type === "writing_revision_created")
+    .map((event) => event.event_id as string);
   const evidenceRefs = objectiveResults.length > 0
     ? objectiveResults.flatMap((item: Document) => item.evidence_refs)
-    : [terminal.event_id];
+    : userArtifacts.length > 0 ? userArtifacts : [terminal.event_id];
   return {
     schema_version: "0.1.0",
     protocol_version: "0.1.0",
@@ -60,8 +66,8 @@ export function deriveSessionResult(
     effective_duration_seconds: Math.floor((terminal.monotonic_offset_ms - first.monotonic_offset_ms) / 1000),
     activities_completed: terminal.payload.completed_activity_ids,
     objective_results: objectiveResults,
-    user_artifacts: [],
-    corrections: [],
+    user_artifacts: userArtifacts,
+    corrections,
     retries: [],
     self_assessments: [],
     abandonment: null,

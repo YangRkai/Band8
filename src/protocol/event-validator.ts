@@ -1,3 +1,8 @@
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { resolve, sep } from "node:path";
+
+import { validateArtifactSemantics } from "./artifact-validator.js";
 import { ProtocolValidationError, type EventValidationMode } from "./validator.js";
 
 type Document = Record<string, any>;
@@ -48,7 +53,13 @@ function validatePayload(event: Document): void {
   }
 }
 
-export function validateEventsSemantics(events: Document[], packageDocument: Document | undefined, mode: EventValidationMode): { state: StreamState } {
+export function validateEventsSemantics(
+  events: Document[],
+  packageDocument: Document | undefined,
+  mode: EventValidationMode,
+  artifacts?: ReadonlyMap<string, Document>,
+  artifactRoot?: string,
+): { state: StreamState } {
   if (events.length === 0) fail("event stream is empty");
   for (const event of events) validatePayload(event);
   if (new Set(events.map((event) => event.event_id)).size !== events.length) fail("event IDs must be unique");
@@ -64,6 +75,37 @@ export function validateEventsSemantics(events: Document[], packageDocument: Doc
   let previousOffset = -1;
   let previousTimestamp: string | undefined;
   let terminal = false;
+  const activityArtifactReferences = new Map<string, Set<string>>();
+  const validateArtifactReference = (artifactId: string, currentContext: boolean, activityId: string | null): void => {
+    if (artifacts === undefined) fail("artifact validation context is required for artifact references");
+    const metadata = artifacts.get(artifactId);
+    if (metadata === undefined) fail("artifact reference points to missing metadata");
+    validateArtifactSemantics(metadata);
+    if (currentContext) {
+      if (metadata.source_activity_id !== activityId) fail("artifact source activity does not match event");
+      if ([metadata.session_id, metadata.run_id, metadata.segment_id, metadata.package_id].join("|") !== [first.session_id, first.run_id, first.segment_id, first.package_id].join("|")) {
+        fail("artifact metadata context does not match event stream");
+      }
+      if (activityId !== null) {
+        const references = activityArtifactReferences.get(activityId) ?? new Set<string>();
+        references.add(artifactId);
+        activityArtifactReferences.set(activityId, references);
+      }
+    }
+    if (artifactRoot !== undefined) {
+      const root = resolve(artifactRoot);
+      const path = resolve(root, metadata.relative_path);
+      if (path !== root && !path.startsWith(`${root}${sep}`)) fail("artifact relative_path escapes artifact root");
+      let bytes: Buffer;
+      try {
+        bytes = readFileSync(path);
+      } catch {
+        fail("artifact bytes are missing");
+      }
+      const actualHash = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+      if (actualHash !== metadata.content_hash) fail("artifact content hash mismatch");
+    }
+  };
   for (const [zeroIndex, event] of events.entries()) {
     const index = zeroIndex + 1;
     if (terminal) fail("event occurs after terminal event");
@@ -93,7 +135,14 @@ export function validateEventsSemantics(events: Document[], packageDocument: Doc
       if (!["RUNNING", "SUSPENDED"].includes(sessionState)) fail("abandonment requires runnable state");
       sessionState = "ABORTED";
     } else if (event.event_type === "session_quarantined") sessionState = "QUARANTINED";
-    else if (event.event_type === "coach_checkpoint_reached") sessionState = "AWAITING_COACH";
+    else if (event.event_type === "coach_checkpoint_reached") {
+      if (sessionState !== "RUNNING" || active.size > 0) fail("Coach checkpoint requires quiescent running state");
+      if (packageDocument !== undefined) {
+        const configured = packageDocument.completion_policy.coach_checkpoint;
+        if (configured === null || configured.checkpoint_id !== event.payload.checkpoint_id) fail("Coach checkpoint event does not match package");
+      }
+      sessionState = "AWAITING_COACH";
+    }
     else if (!["session_started", "clock_anomaly_detected", "record_invalidated", "record_migrated"].includes(event.event_type) && sessionState !== "RUNNING") fail("activity event requires running state");
     if (event.event_type === "activity_started") {
       if (activityId === null || active.has(activityId)) fail("activity_started has invalid state");
@@ -103,8 +152,24 @@ export function validateEventsSemantics(events: Document[], packageDocument: Doc
       active.delete(activityId);
     } else if (activityId !== null && !["record_invalidated", "record_migrated"].includes(event.event_type) && !active.has(activityId)) fail("activity event occurs outside active activity");
     if (event.event_type === "record_invalidated" && (event.invalidates !== event.payload.target_record_id || !seenEvents.has(event.invalidates))) fail("record invalidation target is invalid");
+    if (event.event_type === "artifact_created") validateArtifactReference(event.payload.artifact_id as string, true, activityId);
+    if (event.event_type === "answer_submitted" && event.payload.response_kind === "text" && event.payload.output_ref !== undefined) {
+      validateArtifactReference(event.payload.output_ref as string, true, activityId);
+    }
+    if (["writing_revision_created", "speaking_recording_created"].includes(event.event_type)) {
+      validateArtifactReference(event.payload.artifact_id as string, true, activityId);
+    }
+    if (["correction_submitted", "retry_completed"].includes(event.event_type) && event.payload.output_ref !== undefined) {
+      validateArtifactReference(event.payload.output_ref as string, true, activityId);
+    }
+    if (["correction_started", "correction_submitted", "retry_started", "retry_completed"].includes(event.event_type) && event.payload.source_output_ref !== undefined) {
+      validateArtifactReference(event.payload.source_output_ref as string, false, activityId);
+    }
     seenEvents.add(event.event_id);
     terminal = terminalEvents.has(event.event_type);
+  }
+  if ([...activityArtifactReferences.values()].some((references) => references.size > 1)) {
+    fail("activity artifact references do not identify one immutable output");
   }
   if (mode === "complete" && active.size > 0) fail("terminal event leaves activities active");
   return { state: terminal ? sessionState as Exclude<StreamState, "VALID_INCOMPLETE"> : "VALID_INCOMPLETE" };
