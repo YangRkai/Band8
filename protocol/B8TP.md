@@ -60,7 +60,7 @@ Packages cannot define active UI, HTML execution, scripts, network calls, host p
 
 ## Package identity
 
-The canonical package hash is SHA-256 over UTF-8 JSON serialized with sorted keys, no insignificant whitespace, and unescaped Unicode. Same `package_id` plus same hash is an idempotent no-op. Same ID plus a different hash is a collision and is rejected.
+The canonical package projection is the complete validated training-package JSON object, including every schema-defined field and excluding the separately stored protected-evaluation document. The canonical package hash is SHA-256 over the UTF-8 bytes of that projection serialized with RFC 8785 JSON Canonicalization Scheme (JCS). The canonicalization algorithm is recorded as `canonicalization_algorithm: RFC8785-JCS`. JCS supplies recursive UTF-16 code-unit key ordering, ECMAScript number and string serialization, no insignificant whitespace, unchanged array order, and no Unicode normalization. Inputs must first pass strict JSON parsing and I-JSON constraints: duplicate object names, lone surrogates, non-finite numbers, and integers outside the JavaScript safe-integer range are rejected. Same `package_id` plus same hash is an idempotent no-op. Same ID plus a different hash is a collision and is rejected.
 
 ## Validation claim
 

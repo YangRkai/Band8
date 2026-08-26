@@ -3,11 +3,12 @@ from __future__ import annotations
 import subprocess
 import sys
 import json
-import hashlib
 import tempfile
 import unittest
 from copy import deepcopy
 from pathlib import Path
+
+from tests.protocol.validate_protocol import canonical_document_hash
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -162,9 +163,7 @@ class ProtocolValidationTests(unittest.TestCase):
     def test_duplicate_package_identity_distinguishes_idempotency_and_collision(self) -> None:
         package_path = FIXTURES / "valid" / "minimal-training-package.json"
         package = json.loads(package_path.read_text(encoding="utf-8"))
-        package_hash = "sha256:" + hashlib.sha256(
-            json.dumps(package, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-        ).hexdigest()
+        package_hash = canonical_document_hash(package)
         same = self.run_validator(
             "package",
             str(package_path),

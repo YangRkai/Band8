@@ -3,7 +3,7 @@
   "protocol_version": "0.1.0",
   "evaluation_id": "eval-minimal-001",
   "package_id": "pkg-minimal-001",
-  "package_hash": "sha256:592a4d72347c5e0814560daccb8901ad06bd414eda85835ee693c5972f0aa6ef",
+  "package_hash": "sha256:6d1f3c8a383fed33122cb7fb820b4686c58857dd5f3e2ecdf0f3ecfe60daa389",
   "content_hash": "sha256:2320528de83bb659fd96d156968e095a64d7b109b8261d5f315ae4b3cdcf7cae",
   "entries": [
     {

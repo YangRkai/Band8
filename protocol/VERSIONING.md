@@ -14,6 +14,8 @@ Every accepted package records:
 - Runtime/interpreter version;
 - validator version.
 
+Canonical package identity uses `canonicalization_algorithm: RFC8785-JCS` followed by SHA-256. This pre-release correction replaces the earlier implementation-dependent JSON serialization wording without changing the canonical package projection or introducing a migration version. No production learner data exists under the superseded behavior.
+
 The immutable accepted package is stored with its segment, so events, artifacts, protected evaluation, checkpoints, and results resolve to the exact semantics that produced them.
 
 ## Compatibility

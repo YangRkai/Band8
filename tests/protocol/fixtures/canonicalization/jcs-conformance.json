@@ -1,0 +1,44 @@
+[
+  {
+    "name": "integral-float",
+    "input_json": "{\"score\":8.0}",
+    "canonical_json": "{\"score\":8}",
+    "valid": true
+  },
+  {
+    "name": "integer",
+    "input_json": "{\"score\":8}",
+    "canonical_json": "{\"score\":8}",
+    "valid": true
+  },
+  {
+    "name": "nested-unicode-array-numbers",
+    "input_json": "{\"zero\":-0.0,\"unicode\":\"é\",\"nested\":{\"z\":4.50,\"a\":2e-3},\"array\":[3,{\"b\":2,\"a\":1}]}",
+    "canonical_json": "{\"array\":[3,{\"a\":1,\"b\":2}],\"nested\":{\"a\":0.002,\"z\":4.5},\"unicode\":\"é\",\"zero\":0}",
+    "valid": true
+  },
+  {
+    "name": "duplicate-property",
+    "input_json": "{\"key\":1,\"key\":2}",
+    "canonical_json": null,
+    "valid": false
+  },
+  {
+    "name": "unsafe-integer",
+    "input_json": "{\"value\":9007199254740992}",
+    "canonical_json": null,
+    "valid": false
+  },
+  {
+    "name": "non-finite-number",
+    "input_json": "{\"value\":NaN}",
+    "canonical_json": null,
+    "valid": false
+  },
+  {
+    "name": "lone-surrogate",
+    "input_json": "{\"value\":\"\\ud800\"}",
+    "canonical_json": null,
+    "valid": false
+  }
+]

@@ -3,11 +3,14 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import re
 import sys
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
+
+import rfc8785
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -16,6 +19,7 @@ PROTOCOL_VERSION = "0.1.0"
 MAX_DOCUMENT_BYTES = 1024 * 1024
 MAX_DEPTH = 16
 MAX_TEXT_LENGTH = 12000
+MAX_SAFE_INTEGER = 9_007_199_254_740_991
 PRIMITIVES = {
     "INSTRUCTION", "PRESENT_TEXT", "PLAY_AUDIO", "SELECT", "MATCH", "ORDER",
     "TEXT_RESPONSE", "EVIDENCE_SELECT", "SPEAK_RECORD", "SELF_ASSESS",
@@ -44,9 +48,10 @@ class ValidationError(ValueError):
 
 
 def canonical_json_bytes(document: Any) -> bytes:
-    return json.dumps(
-        document, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    ).encode("utf-8")
+    try:
+        return rfc8785.dumps(document)
+    except rfc8785.CanonicalizationError as exc:
+        raise ValidationError(f"RFC 8785 canonicalization failed: {exc}") from exc
 
 
 def canonical_document_hash(document: Any) -> str:
@@ -70,11 +75,32 @@ def classify_package_identity(
     raise ValidationError(f"package_id collision with different content: {package_id}")
 
 
+def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    document: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in document:
+            raise ValidationError(f"duplicate JSON object property: {key}")
+        document[key] = value
+    return document
+
+
+def reject_non_finite_number(value: str) -> None:
+    raise ValidationError(f"non-finite JSON number is forbidden: {value}")
+
+
+def strict_json_loads(value: str) -> Any:
+    return json.loads(
+        value,
+        object_pairs_hook=reject_duplicate_keys,
+        parse_constant=reject_non_finite_number,
+    )
+
+
 def load_json(path: Path, max_bytes: int = MAX_DOCUMENT_BYTES) -> Any:
     try:
         if path.stat().st_size > max_bytes:
             raise ValidationError(f"document exceeds {max_bytes} bytes")
-        return json.loads(path.read_text(encoding="utf-8"))
+        return strict_json_loads(path.read_text(encoding="utf-8"))
     except ValidationError:
         raise
     except (OSError, json.JSONDecodeError) as exc:
@@ -90,7 +116,7 @@ def load_ndjson(path: Path) -> list[Any]:
             if not line.strip():
                 continue
             try:
-                documents.append(json.loads(line))
+                documents.append(strict_json_loads(line))
             except json.JSONDecodeError as exc:
                 raise ValidationError(f"line {number} is malformed JSON: {exc.msg}") from exc
         if not documents:
@@ -181,6 +207,10 @@ def validate_schema(instance: Any, schema: dict[str, Any], root: dict[str, Any],
             except ValueError as exc:
                 raise ValidationError(f"{path}: invalid RFC 3339 date-time") from exc
     if isinstance(instance, (int, float)) and not isinstance(instance, bool):
+        if isinstance(instance, int) and not -MAX_SAFE_INTEGER <= instance <= MAX_SAFE_INTEGER:
+            raise ValidationError(f"{path}: integer is outside the JavaScript safe integer range")
+        if isinstance(instance, float) and not math.isfinite(instance):
+            raise ValidationError(f"{path}: non-finite number is forbidden")
         if "minimum" in schema and instance < schema["minimum"]:
             raise ValidationError(f"{path}: number is below minimum")
         if "maximum" in schema and instance > schema["maximum"]:

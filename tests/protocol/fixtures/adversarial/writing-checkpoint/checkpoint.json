@@ -8,7 +8,7 @@
   "run_id": "run-writing-checkpoint-001",
   "segment_id": "segment-writing-001",
   "package_id": "pkg-writing-checkpoint-a",
-  "package_hash": "sha256:fb34545aa89995bcf58d65310ac3fd79cd578d2372bd30e91a772f83363c1611",
+  "package_hash": "sha256:0dda3c5cfeb24b09b1193e151d17033645ffec789ee9a1c350afb1dc01b5e966",
   "required_evidence_refs": [
     "artifact-writing-original-001"
   ],

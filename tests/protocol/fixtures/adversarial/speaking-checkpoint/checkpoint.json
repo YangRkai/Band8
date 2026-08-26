@@ -8,7 +8,7 @@
   "run_id": "run-speaking-checkpoint-001",
   "segment_id": "segment-speaking-001",
   "package_id": "pkg-speaking-checkpoint-a",
-  "package_hash": "sha256:4cad0e2cfc790a7ba41af85d64864d03025d62e2cc841b42fc8c0fd53e1fbf61",
+  "package_hash": "sha256:6298ae584aa4a248eeb31aa5723b661f29a6a5eae333f8d5dcd431dbb3289563",
   "required_evidence_refs": [
     "artifact-speaking-original-001"
   ],
