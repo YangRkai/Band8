@@ -886,11 +886,35 @@ def validate_reinforcement_decision(
         intervention = chain["targeted_intervention"]
         if intervention is None:
             raise ValidationError("PATTERN_BROKEN requires a targeted intervention")
+        intervention_time = datetime.fromisoformat(
+            intervention["occurred_at"].replace("Z", "+00:00")
+        ).timestamp()
+        if any(
+            datetime.fromisoformat(item["occurred_at"].replace("Z", "+00:00")).timestamp()
+            >= intervention_time
+            for item in weakness
+        ):
+            raise ValidationError("PATTERN_BROKEN weaknesses must precede the intervention")
         improvement = chain["repeated_improvement"]
-        if len(improvement) < 2 or any(item["outcome"] != "successful" for item in improvement):
-            raise ValidationError("PATTERN_BROKEN requires two successful improvements")
+        if (
+            len(improvement) < 2
+            or len({item["session_id"] for item in improvement}) < 2
+            or any(
+                item["outcome"] != "successful"
+                or datetime.fromisoformat(item["occurred_at"].replace("Z", "+00:00")).timestamp()
+                <= intervention_time
+                for item in improvement
+            )
+        ):
+            raise ValidationError("PATTERN_BROKEN requires two successful improvements after intervention")
         delayed = chain["delayed_retrieval"]
-        if delayed is None or delayed["outcome"] != "successful" or delayed["delay_seconds"] < 86400:
+        if (
+            delayed is None
+            or delayed["outcome"] != "successful"
+            or delayed["delay_seconds"] < 86400
+            or datetime.fromisoformat(delayed["occurred_at"].replace("Z", "+00:00")).timestamp()
+            - intervention_time < 86400
+        ):
             raise ValidationError("PATTERN_BROKEN requires successful retrieval after 24 hours")
         transfer = chain["transfer"]
         if (
@@ -1101,7 +1125,9 @@ def main(argv: list[str] | None = None) -> int:
                 artifact_root=args.artifact_root,
                 mode=args.mode,
             )
-        elif args.kind in {"result", "artifact", "learner-state", "hypothesis", "review-queue", "checkpoint", "protected-evaluation", "reinforcement-decision", "migration-record"}:
+        elif args.kind == "reinforcement-decision":
+            validate_reinforcement_decision(load_json(args.path))
+        elif args.kind in {"result", "artifact", "learner-state", "hypothesis", "review-queue", "checkpoint", "protected-evaluation", "migration-record"}:
             validate_document(args.kind, load_json(args.path))
         elif args.kind == "golden":
             validate_golden(args.path)

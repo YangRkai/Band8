@@ -6,7 +6,7 @@ import addFormats from "ajv-formats";
 
 import { ProtocolValidationError } from "./validator.js";
 
-export type SchemaKind = "package" | "protected-evaluation" | "event" | "result" | "artifact" | "checkpoint";
+export type SchemaKind = "package" | "protected-evaluation" | "event" | "result" | "artifact" | "checkpoint" | "reinforcement-decision";
 
 const schemaFiles: Record<SchemaKind, string> = {
   package: "training-package.schema.json",
@@ -15,6 +15,7 @@ const schemaFiles: Record<SchemaKind, string> = {
   result: "session-result.schema.json",
   artifact: "artifact-metadata.schema.json",
   checkpoint: "checkpoint.schema.json",
+  "reinforcement-decision": "reinforcement-decision.schema.json",
 };
 
 function describeErrors(errors: ErrorObject[] | null | undefined): string {

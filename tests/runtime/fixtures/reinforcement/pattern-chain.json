@@ -1,0 +1,74 @@
+{
+  "learner_id": "learner-phase1c",
+  "skill_id": "reading.not-given",
+  "error_pattern_id": "hypothesis-reading-evidence-boundary",
+  "source_resource_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "transfer_resource_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "sessions": [
+    {
+      "session_id": "session-pattern-1",
+      "completed_at": "2026-08-20T10:00:00.000Z",
+      "evidence_class": "training_performance",
+      "outcome": "unsuccessful",
+      "evidence_ref": "evidence-pattern-failure-1",
+      "intent": "retrieval",
+      "resource": "source"
+    },
+    {
+      "session_id": "session-pattern-2",
+      "completed_at": "2026-08-21T10:00:00.000Z",
+      "evidence_class": "training_performance",
+      "outcome": "unsuccessful",
+      "evidence_ref": "evidence-pattern-failure-2",
+      "intent": "retrieval",
+      "resource": "source"
+    },
+    {
+      "session_id": "session-pattern-3",
+      "completed_at": "2026-08-22T10:05:00.000Z",
+      "evidence_class": "training_performance",
+      "outcome": "successful",
+      "evidence_ref": "evidence-pattern-improvement-1",
+      "intent": "correction",
+      "resource": "source",
+      "intervention_ref": "evidence-targeted-intervention",
+      "intervention_at": "2026-08-22T10:00:00.000Z"
+    },
+    {
+      "session_id": "session-pattern-4",
+      "completed_at": "2026-08-23T10:00:00.000Z",
+      "evidence_class": "training_performance",
+      "outcome": "successful",
+      "evidence_ref": "evidence-pattern-improvement-2",
+      "intent": "retrieval",
+      "resource": "source"
+    },
+    {
+      "session_id": "session-pattern-delayed",
+      "completed_at": "2026-08-24T12:00:00.000Z",
+      "evidence_class": "training_performance",
+      "outcome": "successful",
+      "evidence_ref": "evidence-delayed-retrieval",
+      "intent": "retrieval",
+      "resource": "source"
+    },
+    {
+      "session_id": "session-pattern-transfer",
+      "completed_at": "2026-08-24T13:00:00.000Z",
+      "evidence_class": "transfer_performance",
+      "outcome": "successful",
+      "evidence_ref": "evidence-changed-material-transfer",
+      "intent": "transfer",
+      "resource": "transfer"
+    }
+  ],
+  "contradiction": {
+    "session_id": "session-pattern-assessment",
+    "completed_at": "2026-08-25T10:00:00.000Z",
+    "evidence_class": "assessment_performance",
+    "outcome": "unsuccessful",
+    "evidence_ref": "evidence-assessment-regression",
+    "intent": "retrieval",
+    "resource": "transfer"
+  }
+}

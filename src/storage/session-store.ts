@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { canonicalJson, parseJsonStrict } from "../protocol/canonical.js";
@@ -31,6 +31,16 @@ export class SessionStore {
   read(sessionId: string): SessionMetadata {
     if (!this.exists(sessionId)) throw new Error(`session does not exist: ${sessionId}`);
     return parseJsonStrict(readFileSync(this.metadataPath(sessionId), "utf8")) as SessionMetadata;
+  }
+
+  list(): SessionMetadata[] {
+    if (!existsSync(this.workspace.paths.sessions)) return [];
+    return readdirSync(this.workspace.paths.sessions, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => join(this.workspace.paths.sessions, entry.name, "session.json"))
+      .filter((path) => existsSync(path))
+      .map((path) => parseJsonStrict(readFileSync(path, "utf8")) as SessionMetadata)
+      .sort((left, right) => left.session_id.localeCompare(right.session_id));
   }
 
   write(metadata: SessionMetadata): void {

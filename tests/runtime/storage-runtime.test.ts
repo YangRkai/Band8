@@ -40,6 +40,8 @@ describe("workspace and package identity", () => {
       "packages",
       "protected",
       "registry",
+      "reinforcementDecisions",
+      "reinforcementQualifications",
       "sessions",
     ]);
     expect(Object.values(workspace.paths).every((path) => path.startsWith(workspace.root))).toBe(true);

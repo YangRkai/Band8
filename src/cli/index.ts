@@ -42,10 +42,10 @@ function parseArguments(argumentsList: string[]): ParsedArguments {
   const sessionId = takeOption(remaining, "--session");
   const [command, ...targets] = remaining;
   if (workspace === undefined || command === undefined || targets.length === 0) {
-    throw new Error("usage: band8 --workspace <path> <validate|import|run|checkpoint|continue> <target...> [--protected <path>] [--session <id>]");
+    throw new Error("usage: band8 --workspace <path> <validate|import|run|checkpoint|continue|reinforce|reveal|mission> <target...> [--protected <path>] [--session <id>]");
   }
-  if (!["validate", "import", "run", "checkpoint", "continue"].includes(command)) throw new Error(`unknown command: ${command}`);
-  const expectedTargets = command === "continue" ? 2 : 1;
+  if (!["validate", "import", "run", "checkpoint", "continue", "reinforce", "reveal", "mission"].includes(command)) throw new Error(`unknown command: ${command}`);
+  const expectedTargets = command === "continue" || command === "reinforce" ? 2 : 1;
   if (targets.length !== expectedTargets) throw new Error(`${command} requires ${expectedTargets} target argument(s)`);
   return {
     workspace: resolve(workspace),
@@ -90,6 +90,19 @@ export async function executeCli(argumentsList: string[], dependencies: CliDepen
     ...(dependencies.now === undefined ? {} : { now: dependencies.now }),
   };
   const runtime = Band8Runtime.open(runtimeOptions);
+  if (parsed.command === "reinforce") {
+    if (parsed.targets[0] !== "evaluate") throw new Error("reinforce requires the evaluate operation");
+    write(canonicalJson(runtime.evaluateReinforcement(parsed.targets[1]!)));
+    return 0;
+  }
+  if (parsed.command === "reveal") {
+    write(canonicalJson(runtime.reveal(parsed.targets[0]!)));
+    return 0;
+  }
+  if (parsed.command === "mission") {
+    write(canonicalJson(runtime.mission(parsed.targets[0]!)));
+    return 0;
+  }
   if (parsed.command === "import") {
     const packageText = readFileSync(resolve(parsed.targets[0]!), "utf8");
     const protectedText = parsed.protectedPath === undefined ? undefined : readFileSync(parsed.protectedPath, "utf8");

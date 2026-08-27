@@ -55,6 +55,19 @@ describe("headless CLI harness", () => {
     expect(serialized).toContain("COMPLETED");
     expect(serialized).not.toMatch(/correct_option_ids|scoring_rule|integrity_ref/u);
     expect(JSON.parse(readFileSync(join(path, "registry", "imports.json"), "utf8")).packages).toHaveProperty("pkg-runtime-reading-001");
+
+    output.length = 0;
+    expect(await executeCli(["--workspace", path, "reinforce", "evaluate", "session-cli-golden"], dependencies)).toBe(0);
+    const reinforcement = JSON.parse(output.at(-1)!) as Record<string, any>;
+    expect(reinforcement.eligible.map((item: Record<string, any>) => item.event_type)).toContain("SESSION_COMPLETE");
+
+    output.length = 0;
+    expect(await executeCli(["--workspace", path, "reveal", "session-cli-golden"], dependencies)).toBe(0);
+    expect(JSON.parse(output.at(-1)!).primary_event.event_type).toBe("MISSION_ADVANCED");
+
+    output.length = 0;
+    expect(await executeCli(["--workspace", path, "mission", "session-cli-golden"], dependencies)).toBe(0);
+    expect(JSON.parse(output.at(-1)!).status).toBe("VALIDATION_PENDING");
   });
 
   it("ingests Writing text, exports its checkpoint, and attaches a continuation through CLI adapters", async () => {

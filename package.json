@@ -16,6 +16,7 @@
     "test:writing": "vitest run tests/runtime/writing-protocol.test.ts tests/runtime/artifact-store.test.ts tests/runtime/writing-runtime.test.ts tests/runtime/continuation-runtime.test.ts tests/runtime/writing-golden.test.ts",
     "generate:writing-fixtures": "node tests/runtime/fixtures/writing-golden/generate.mjs",
     "smoke:writing": "node tests/runtime/manual-writing-smoke.mjs",
+    "smoke:reinforcement": "node tests/runtime/manual-reinforcement-smoke.mjs",
     "test:crash": "vitest run tests/runtime/runtime-golden.test.ts -t \"survives restart\"",
     "test:idempotency": "vitest run tests/runtime/storage-runtime.test.ts tests/runtime/runtime-golden.test.ts -t \"persists import identity|different canonical content|duplicate resume|rebuilds\""
   },

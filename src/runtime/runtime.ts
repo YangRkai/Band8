@@ -7,9 +7,12 @@ import { CheckpointStore } from "../storage/checkpoint-store.js";
 import { CoachExchange, type ContinuationBinding } from "../storage/coach-exchange.js";
 import { AppendOnlyEventStore, type EventContext } from "../storage/event-store.js";
 import { PackageImporter } from "../storage/package-importer.js";
+import { ReinforcementStore } from "../storage/reinforcement-store.js";
 import { SessionStore, type SessionMetadata } from "../storage/session-store.js";
 import { initializeWorkspace } from "../storage/workspace.js";
 import { continuationSessionId, priorEvidenceFingerprint } from "./continuation.js";
+import { ReinforcementEngine } from "../reinforcement/engine.js";
+import { projectReveal } from "../reinforcement/reveal.js";
 import { projectLearnerActivity } from "./projection.js";
 import { deriveSessionResult } from "./result.js";
 import { transitionState } from "./state-machine.js";
@@ -22,6 +25,7 @@ export interface RuntimeOptions {
   eventIdFactory?: () => string;
   artifactIdFactory?: () => string;
   now?: () => string;
+  learnerId?: string;
 }
 
 export type InspectionStatus = "AUTHORITATIVE" | "VALID_INCOMPLETE" | "REBUILD_REQUIRED" | "QUARANTINED";
@@ -41,6 +45,7 @@ export class Band8Runtime {
   readonly #checkpoints: CheckpointStore;
   readonly #coach: CoachExchange;
   readonly #events: AppendOnlyEventStore;
+  readonly #reinforcement: ReinforcementEngine;
   readonly #now: () => string;
   readonly #artifactIdFactory: () => string;
 
@@ -60,6 +65,17 @@ export class Band8Runtime {
       options.eventIdFactory ?? (() => `event-${randomUUID()}`),
       () => ({ artifacts: this.#artifacts.metadataById(), artifactRoot: this.#artifacts.root }),
     );
+    const reinforcementStore = new ReinforcementStore(workspace, this.#validator);
+    this.#reinforcement = new ReinforcementEngine({
+      learnerId: options.learnerId ?? "learner-local-default",
+      now: this.#now,
+      validator: this.#validator,
+      importer: this.#importer,
+      sessions: this.#sessions,
+      events: this.#events,
+      store: reinforcementStore,
+      inspectSession: (sessionId) => this.inspectSession(sessionId),
+    });
   }
 
   static open(options: RuntimeOptions): Band8Runtime {
@@ -322,6 +338,18 @@ export class Band8Runtime {
 
   events(sessionId: string): Document[] {
     return this.#events.read(sessionId);
+  }
+
+  evaluateReinforcement(sessionId: string): ReturnType<ReinforcementEngine["evaluate"]> {
+    return this.#reinforcement.evaluate(sessionId);
+  }
+
+  mission(identifier: string): ReturnType<ReinforcementEngine["mission"]> {
+    return this.#reinforcement.mission(identifier);
+  }
+
+  reveal(sessionId: string): ReturnType<typeof projectReveal> {
+    return projectReveal(this.evaluateReinforcement(sessionId));
   }
 
   readArtifactText(artifactId: string): string {
