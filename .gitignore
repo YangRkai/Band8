@@ -26,6 +26,8 @@ Desktop.ini
 build/
 dist/
 coverage/
+playwright-report/
+test-results/
 node_modules/
 .cache/
 .tmp/

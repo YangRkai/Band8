@@ -13,7 +13,8 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "declaration": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "jsx": "react-jsx"
   },
-  "include": ["src/**/*.ts", "tests/runtime/**/*.ts"]
+  "include": ["src/**/*.ts", "tests/runtime/**/*.ts", "tests/server/**/*.ts", "tests/web/**/*.tsx"]
 }

@@ -7,8 +7,9 @@
     "band8": "dist/src/cli/index.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "vite --config web/vite.config.ts",
+    "build": "tsc -p tsconfig.json && vite build --config web/vite.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p web/tsconfig.json --noEmit",
     "test": "vitest run",
     "test:runtime": "vitest run tests/runtime",
     "test:parity": "vitest run tests/runtime/protocol-parity.test.ts tests/runtime/cross-language-canonical.test.ts",
@@ -18,7 +19,10 @@
     "smoke:writing": "node tests/runtime/manual-writing-smoke.mjs",
     "smoke:reinforcement": "node tests/runtime/manual-reinforcement-smoke.mjs",
     "test:crash": "vitest run tests/runtime/runtime-golden.test.ts -t \"survives restart\"",
-    "test:idempotency": "vitest run tests/runtime/storage-runtime.test.ts tests/runtime/runtime-golden.test.ts -t \"persists import identity|different canonical content|duplicate resume|rebuilds\""
+    "test:idempotency": "vitest run tests/runtime/storage-runtime.test.ts tests/runtime/runtime-golden.test.ts -t \"persists import identity|different canonical content|duplicate resume|rebuilds\"",
+    "test:server": "vitest run tests/server",
+    "test:web": "vitest run tests/web",
+    "test:e2e": "npm run build && node tests/e2e/run.mjs"
   },
   "engines": {
     "node": ">=20"
@@ -27,11 +31,17 @@
     "ajv": "8.17.1",
     "ajv-formats": "3.0.1",
     "canonicalize": "2.1.0",
-    "jsonc-parser": "3.3.1"
+    "jsonc-parser": "3.3.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/node": "22.10.2",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
     "typescript": "5.7.2",
+    "vite": "^5.4.21",
     "vitest": "2.1.8"
   }
 }

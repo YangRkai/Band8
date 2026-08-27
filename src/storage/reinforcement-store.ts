@@ -121,6 +121,20 @@ export class ReinforcementStore {
     return document;
   }
 
+  listQualifications(): Document[] {
+    return readdirSync(this.workspace.paths.reinforcementQualifications, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+      .map((entry) => {
+        const document = parseJsonStrict(readFileSync(join(this.workspace.paths.reinforcementQualifications, entry.name), "utf8")) as Document;
+        validateQualification(document);
+        this.#validateDecisionRelation(document);
+        const key = qualificationIdentity(document.learner_id, document.skill_id, document.error_pattern_id);
+        if (entry.name !== `${storageKey(key)}.json`) throw new Error("current qualification path identity mismatch");
+        return document;
+      })
+      .sort((left, right) => String(left.skill_id).localeCompare(String(right.skill_id)) || String(left.error_pattern_id).localeCompare(String(right.error_pattern_id)));
+  }
+
   #validateDecisionRelation(document: Document): void {
     const decisions = this.listDecisions();
     const historical = decisions.find((decision) => decision.decision_id === document.historical_award_id);

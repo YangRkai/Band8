@@ -1,10 +1,10 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
 import { executeCli } from "../../src/cli/index.js";
+import type { RunningBand8Server } from "../../src/server/server.js";
 import { storageKey } from "../../src/storage/workspace.js";
 
 const repositoryRoot = resolve(process.cwd());
@@ -15,7 +15,9 @@ const writingPackageBPath = resolve(repositoryRoot, "tests/protocol/fixtures/adv
 const temporaryPaths: string[] = [];
 
 function workspace(): string {
-  const path = mkdtempSync(join(tmpdir(), "band8-cli-"));
+  const temporaryRoot = join(repositoryRoot, ".tmp");
+  mkdirSync(temporaryRoot, { recursive: true });
+  const path = mkdtempSync(join(temporaryRoot, "band8-cli-"));
   temporaryPaths.push(path);
   return path;
 }
@@ -25,6 +27,33 @@ afterEach(() => {
 });
 
 describe("headless CLI harness", () => {
+  it("starts the loopback web shell with explicit no-open lifecycle options", async () => {
+    const path = workspace();
+    const output: string[] = [];
+    let received: Record<string, any> | undefined;
+    let waitedForShutdown = false;
+    let closed = false;
+    const dependencies = {
+      repositoryRoot,
+      write: (value: string) => output.push(value),
+      startServer: async (options: Record<string, any>) => {
+        received = options;
+        return { host: "127.0.0.1" as const, port: 43127, url: "http://127.0.0.1:43127", close: async () => { closed = true; } };
+      },
+      waitForShutdown: async (running: RunningBand8Server) => { waitedForShutdown = true; await running.close(); },
+      openBrowser: () => { throw new Error("--no-open must not open a browser"); },
+    };
+
+    expect(await executeCli(["--workspace", path, "serve", "--port", "0", "--no-open"], dependencies)).toBe(0);
+    expect(received).toMatchObject({ repositoryRoot, workspacePath: path, port: 0 });
+    expect(output.join("\n")).toContain("Band8 local server");
+    expect(output.join("\n")).toContain(`Workspace:\n${path}`);
+    expect(output.join("\n")).toContain("Learning timezone:\nNOT_CONFIGURED");
+    expect(output.join("\n")).toContain("Open:\nhttp://127.0.0.1:43127");
+    expect(waitedForShutdown).toBe(true);
+    expect(closed).toBe(true);
+  });
+
   it("configures and explicitly changes the Runtime learning timezone", async () => {
     const path = workspace();
     const output: string[] = [];

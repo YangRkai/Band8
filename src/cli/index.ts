@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -8,6 +9,7 @@ import { createInterface } from "node:readline/promises";
 import { canonicalJson, parseJsonStrict } from "../protocol/canonical.js";
 import { createProtocolValidator } from "../protocol/validator.js";
 import { Band8Runtime } from "../runtime/runtime.js";
+import { startBand8Server, type RunningBand8Server, type StartBand8ServerOptions } from "../server/server.js";
 
 interface CliDependencies {
   repositoryRoot?: string;
@@ -16,6 +18,9 @@ interface CliDependencies {
   eventIdFactory?: () => string;
   artifactIdFactory?: () => string;
   timezoneEpochIdFactory?: () => string;
+  startServer?: (options: StartBand8ServerOptions) => Promise<RunningBand8Server>;
+  waitForShutdown?: (running: RunningBand8Server) => Promise<void>;
+  openBrowser?: (url: string) => void;
   now?: () => string;
 }
 
@@ -25,6 +30,8 @@ interface ParsedArguments {
   targets: string[];
   protectedPath?: string;
   sessionId?: string;
+  port?: number;
+  noOpen: boolean;
 }
 
 function takeOption(argumentsList: string[], name: string): string | undefined {
@@ -36,17 +43,33 @@ function takeOption(argumentsList: string[], name: string): string | undefined {
   return value;
 }
 
+function takeFlag(argumentsList: string[], name: string): boolean {
+  const index = argumentsList.indexOf(name);
+  if (index < 0) return false;
+  argumentsList.splice(index, 1);
+  return true;
+}
+
 function parseArguments(argumentsList: string[]): ParsedArguments {
   const remaining = [...argumentsList];
   const workspace = takeOption(remaining, "--workspace");
   const protectedPath = takeOption(remaining, "--protected");
   const sessionId = takeOption(remaining, "--session");
+  const portText = takeOption(remaining, "--port");
+  const noOpen = takeFlag(remaining, "--no-open");
   const [command, ...targets] = remaining;
-  if (workspace === undefined || command === undefined || targets.length === 0) {
-    throw new Error("usage: band8 --workspace <path> <validate|import|run|checkpoint|continue|reinforce|reveal|mission|timezone> <target...> [--protected <path>] [--session <id>]");
+  if (workspace === undefined || command === undefined) {
+    throw new Error("usage: band8 --workspace <path> <serve|validate|import|run|checkpoint|continue|reinforce|reveal|mission|timezone> [target...] [--port <port>] [--no-open]");
   }
-  if (!["validate", "import", "run", "checkpoint", "continue", "reinforce", "reveal", "mission", "timezone"].includes(command)) throw new Error(`unknown command: ${command}`);
-  if (command === "timezone") {
+  if (!["serve", "validate", "import", "run", "checkpoint", "continue", "reinforce", "reveal", "mission", "timezone"].includes(command)) throw new Error(`unknown command: ${command}`);
+  let port: number | undefined;
+  if (portText !== undefined) {
+    port = Number(portText);
+    if (!Number.isInteger(port) || port < 0 || port > 65_535) throw new Error("--port must be an integer from 0 to 65535");
+  }
+  if (command === "serve") {
+    if (targets.length !== 0) throw new Error("serve does not accept target arguments");
+  } else if (command === "timezone") {
     const operation = targets[0];
     if (operation === "get" && targets.length !== 1) throw new Error("timezone get requires no value");
     if (["set", "change"].includes(operation ?? "") && targets.length !== 2) throw new Error(`timezone ${operation} requires one value`);
@@ -61,7 +84,36 @@ function parseArguments(argumentsList: string[]): ParsedArguments {
     targets,
     ...(protectedPath === undefined ? {} : { protectedPath: resolve(protectedPath) }),
     ...(sessionId === undefined ? {} : { sessionId }),
+    ...(port === undefined ? {} : { port }),
+    noOpen,
   };
+}
+
+function openFixedLocalUrl(url: string): void {
+  const parsed = new URL(url);
+  if (parsed.protocol !== "http:" || parsed.hostname !== "127.0.0.1") throw new Error("refusing to open a non-loopback URL");
+  const command = process.platform === "win32" ? "cmd" : process.platform === "darwin" ? "open" : "xdg-open";
+  const args = process.platform === "win32" ? ["/c", "start", "", parsed.href] : [parsed.href];
+  const child = spawn(command, args, { detached: true, stdio: "ignore", windowsHide: true });
+  child.unref();
+}
+
+async function waitForServerShutdown(running: RunningBand8Server): Promise<void> {
+  await new Promise<void>((resolveShutdown, reject) => {
+    let stopping = false;
+    const cleanup = () => {
+      process.off("SIGINT", stop);
+      process.off("SIGTERM", stop);
+    };
+    const stop = () => {
+      if (stopping) return;
+      stopping = true;
+      cleanup();
+      running.close().then(resolveShutdown, reject);
+    };
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
+  });
 }
 
 async function terminalRead(prompt: string): Promise<string> {
@@ -99,6 +151,26 @@ export async function executeCli(argumentsList: string[], dependencies: CliDepen
     ...(dependencies.now === undefined ? {} : { now: dependencies.now }),
   };
   const runtime = Band8Runtime.open(runtimeOptions);
+  if (parsed.command === "serve") {
+    const running = await (dependencies.startServer ?? startBand8Server)({
+      repositoryRoot,
+      workspacePath: parsed.workspace,
+      port: parsed.port ?? 0,
+    });
+    write("Band8 local server");
+    write("");
+    write("Workspace:");
+    write(parsed.workspace);
+    write("");
+    write("Learning timezone:");
+    write(runtime.learningTimezone()?.learning_timezone ?? "NOT_CONFIGURED");
+    write("");
+    write("Open:");
+    write(running.url);
+    if (!parsed.noOpen) (dependencies.openBrowser ?? openFixedLocalUrl)(running.url);
+    await (dependencies.waitForShutdown ?? waitForServerShutdown)(running);
+    return 0;
+  }
   if (parsed.command === "timezone") {
     const operation = parsed.targets[0]!;
     if (operation === "get") {

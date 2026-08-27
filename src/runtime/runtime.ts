@@ -1,4 +1,6 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { dirname, relative, resolve } from "node:path";
 
 import { canonicalHash, parseJsonStrict } from "../protocol/canonical.js";
 import { createProtocolValidator, type ProtocolValidator } from "../protocol/validator.js";
@@ -6,7 +8,7 @@ import { ArtifactStore } from "../storage/artifact-store.js";
 import { CheckpointStore } from "../storage/checkpoint-store.js";
 import { CoachExchange, type ContinuationBinding } from "../storage/coach-exchange.js";
 import { AppendOnlyEventStore, type EventContext } from "../storage/event-store.js";
-import { PackageImporter } from "../storage/package-importer.js";
+import { PackageImporter, type ImportRecord } from "../storage/package-importer.js";
 import { ReinforcementStore } from "../storage/reinforcement-store.js";
 import {
   LearningTimezoneStore,
@@ -15,12 +17,27 @@ import {
 } from "../storage/learning-timezone-store.js";
 import { SessionStore, type SessionMetadata } from "../storage/session-store.js";
 import { initializeWorkspace } from "../storage/workspace.js";
+import type { RuntimeWorkspace } from "../storage/workspace.js";
 import { continuationSessionId, priorEvidenceFingerprint } from "./continuation.js";
 import { ReinforcementEngine } from "../reinforcement/engine.js";
 import { projectReveal } from "../reinforcement/reveal.js";
 import { projectLearnerActivity } from "./projection.js";
 import { deriveSessionResult } from "./result.js";
 import { transitionState } from "./state-machine.js";
+import { projectEffectiveStreak } from "../reinforcement/streak.js";
+import { projectMission } from "../reinforcement/mission.js";
+import {
+  BAND8_IELTS_GOAL,
+  projectIeltsGoal,
+  type CoachProductStatus,
+  type CoachProjection,
+  type HistoryOptions,
+  type HistoryProjection,
+  type ProgressProjection,
+  type TodayProjection,
+  type TrainingProjection,
+  type WorkspaceInformationProjection,
+} from "./product-projection.js";
 
 type Document = Record<string, any>;
 
@@ -52,12 +69,15 @@ export class Band8Runtime {
   readonly #coach: CoachExchange;
   readonly #events: AppendOnlyEventStore;
   readonly #reinforcement: ReinforcementEngine;
+  readonly #reinforcementStore: ReinforcementStore;
   readonly #learningTimezone: LearningTimezoneStore;
+  readonly #workspace: RuntimeWorkspace;
   readonly #now: () => string;
   readonly #artifactIdFactory: () => string;
 
   private constructor(options: RuntimeOptions) {
     const workspace = initializeWorkspace(options.workspacePath);
+    this.#workspace = workspace;
     this.#validator = createProtocolValidator(options.repositoryRoot);
     this.#now = options.now ?? (() => new Date().toISOString());
     this.#artifactIdFactory = options.artifactIdFactory ?? (() => `artifact-${randomUUID()}`);
@@ -73,6 +93,7 @@ export class Band8Runtime {
       () => ({ artifacts: this.#artifacts.metadataById(), artifactRoot: this.#artifacts.root }),
     );
     const reinforcementStore = new ReinforcementStore(workspace, this.#validator);
+    this.#reinforcementStore = reinforcementStore;
     this.#learningTimezone = new LearningTimezoneStore(
       workspace,
       this.#now,
@@ -365,6 +386,230 @@ export class Band8Runtime {
     return this.#learningTimezone.change(timeZone);
   }
 
+  today(): TodayProjection {
+    const packages = this.#importer.list();
+    const session = this.#currentProductSession();
+    const unstarted = this.#latestUnstartedPackage();
+    const projectUnstarted = unstarted !== undefined && (session === undefined || ["COMPLETED", "ABORTED", "QUARANTINED"].includes(session.state));
+    const timezone = this.#learningTimezone.read();
+    const completed = this.#sessions.list()
+      .filter((candidate) => candidate.state === "COMPLETED")
+      .sort((left, right) => this.#sessionTimestamp(left).localeCompare(this.#sessionTimestamp(right)));
+    const latestCompleted = completed.at(-1);
+    const packageDocument = projectUnstarted
+      ? this.#importer.loadPackage(unstarted.package_id)
+      : session === undefined ? undefined : this.#importer.loadPackage(session.package_id);
+    return {
+      empty: packages.length === 0,
+      goal: projectIeltsGoal(packageDocument?.learner_goal as Document | undefined),
+      mission: projectUnstarted
+        ? projectMission(packageDocument!, { state: "READY" })
+        : session === undefined ? null : this.mission(session.session_id),
+      effective_streak: timezone === undefined ? null : projectEffectiveStreak(
+        this.#learningTimezone.listLearningDays(),
+        this.#now(),
+        timezone,
+      ),
+      last_reveal: latestCompleted === undefined || timezone === undefined ? null : this.reveal(latestCompleted.session_id),
+      coach_status: this.#coachProductStatus(),
+      primary_action: packages.length === 0
+        ? "GO_TO_COACH"
+        : session?.state === "AWAITING_COACH" ? "GO_TO_COACH" : "CONTINUE_TRAINING",
+    };
+  }
+
+  training(): TrainingProjection | null {
+    const session = this.#currentProductSession();
+    const unstarted = this.#latestUnstartedPackage();
+    if (unstarted !== undefined && (session === undefined || ["COMPLETED", "ABORTED", "QUARANTINED"].includes(session.state))) {
+      return {
+        session_id: null,
+        package_id: unstarted.package_id,
+        state: "READY_TO_START",
+        activity_number: 0,
+        activity_count: this.#importer.loadPackage(unstarted.package_id).activities.length,
+        mission: null,
+        current_activity: null,
+        integrity: { status: "OK" },
+      };
+    }
+    if (session === undefined) return null;
+    const packageDocument = this.#importer.loadPackage(session.package_id);
+    return {
+      session_id: session.session_id,
+      package_id: session.package_id,
+      state: session.state,
+      activity_number: Math.min(session.current_activity_index + 1, packageDocument.activities.length),
+      activity_count: packageDocument.activities.length,
+      mission: this.mission(session.session_id),
+      current_activity: session.state === "RUNNING" ? this.currentActivity(session.session_id) : null,
+      integrity: session.state === "QUARANTINED" ? { status: this.inspectSession(session.session_id).status } : { status: "OK" },
+    };
+  }
+
+  beginTraining(packageId?: string, sessionId?: string): TrainingProjection {
+    let session: SessionMetadata;
+    if (sessionId !== undefined) session = this.#sessions.read(sessionId);
+    else {
+      const active = this.#sessions.list().find((candidate) => ["READY", "RUNNING", "SUSPENDED"].includes(candidate.state));
+      if (active !== undefined) session = active;
+      else {
+        const selected = packageId ?? this.#latestUnstartedPackage()?.package_id;
+        if (selected === undefined) throw new Error("no training package is imported");
+        session = this.createSession(selected, `session-${randomUUID()}`);
+      }
+    }
+    if (session.state === "READY") this.startSession(session.session_id);
+    else if (session.state === "SUSPENDED") this.resumeSession(session.session_id, `resume-${randomUUID()}`);
+    else if (session.state !== "RUNNING") throw new Error(`session cannot begin training from ${session.state}`);
+    return this.training()!;
+  }
+
+  submitCurrentActivity(sessionId: string, response?: { optionIds?: string[]; text?: string }): Document {
+    const activity = this.currentActivity(sessionId);
+    const beforeArtifacts = new Set(this.#artifacts.listForSession(sessionId).map((item) => item.artifact_id as string));
+    const completion = this.completeCurrentActivity(sessionId, response);
+    const createdArtifacts = this.#artifacts.listForSession(sessionId)
+      .filter((item) => !beforeArtifacts.has(item.artifact_id as string))
+      .map((item) => ({
+        artifact_id: item.artifact_id,
+        artifact_type: item.artifact_type,
+        content_hash: item.content_hash,
+        created_at: item.created_at,
+      }));
+    const objective = completion.result?.objective_results?.find((item: Document) => item.activity_id === activity.activity_id) as Document | undefined;
+    const payload: Document = {
+      state: completion.state,
+      submission: {
+        activity_id: activity.activity_id,
+        ...(objective?.outcome === undefined ? {} : { outcome: objective.outcome, evidence_refs: objective.evidence_refs }),
+      },
+      artifacts: createdArtifacts,
+      training: this.training(),
+    };
+    if (completion.state === "COMPLETED") {
+      payload.reinforcement = this.evaluateReinforcement(sessionId);
+      payload.reveal = this.reveal(sessionId);
+    }
+    if (completion.state === "AWAITING_COACH") payload.coach = this.coachStatus();
+    return payload;
+  }
+
+  coachStatus(): CoachProjection {
+    const sessions = this.#sessions.list();
+    const continuation = sessions.find((session) => session.prior_session_id !== undefined && ["READY", "RUNNING"].includes(session.state));
+    if (continuation !== undefined) return { status: "CONTINUATION_READY", session_id: continuation.session_id };
+    const awaiting = sessions.find((session) => session.state === "AWAITING_COACH"
+      && !sessions.some((candidate) => candidate.prior_session_id === session.session_id));
+    if (awaiting !== undefined) {
+      const checkpoint = this.#checkpoints.read(awaiting.session_id);
+      return {
+        status: "REVIEW_REQUIRED",
+        session_id: awaiting.session_id,
+        checkpoint_id: checkpoint.checkpoint_id,
+        evidence_count: checkpoint.required_evidence_refs.length,
+        evidence_refs: checkpoint.required_evidence_refs,
+        bundle_identity: `coach-bundle:${checkpoint.checkpoint_id}`,
+      };
+    }
+    return { status: this.#importer.list().length === 0 ? "NO_PACKAGE" : "TRAINING_READY" };
+  }
+
+  progress(): ProgressProjection {
+    const sessions = this.#sessions.list();
+    const leaves = sessions.filter((candidate) => !sessions.some((item) => item.prior_session_id === candidate.session_id));
+    const completed = sessions.filter((session) => session.state === "COMPLETED");
+    const latest = completed.sort((left, right) => this.#sessionTimestamp(left).localeCompare(this.#sessionTimestamp(right))).at(-1);
+    const reinforcement = latest === undefined || this.#learningTimezone.read() === undefined
+      ? undefined
+      : this.evaluateReinforcement(latest.session_id);
+    return {
+      goal: projectIeltsGoal(BAND8_IELTS_GOAL),
+      missions: leaves.map((session) => this.mission(session.session_id)),
+      validated_qualifications: this.#reinforcementStore.listQualifications().map((qualification) => ({
+        skill_id: qualification.skill_id as string,
+        error_pattern_id: qualification.error_pattern_id as string,
+        qualification: qualification.qualification as string,
+        evaluated_at: qualification.evaluated_at as string,
+      })),
+      retention: reinforcement?.eligible.some((item) => item.event_type === "RETENTION_CONFIRMED") ? "CONFIRMED" : "EVIDENCE_PENDING",
+      transfer: reinforcement?.eligible.some((item) => item.event_type === "TRANSFER_CONFIRMED") ? "CONFIRMED" : "EVIDENCE_PENDING",
+      pattern_status: reinforcement?.currentQualification?.qualification === "revoked"
+        ? "NEEDS_REVALIDATION"
+        : reinforcement?.eligible.some((item) => item.event_type === "PATTERN_BROKEN") ? "PATTERN_BROKEN" : "EVIDENCE_PENDING",
+    };
+  }
+
+  history(options: HistoryOptions = {}): HistoryProjection {
+    const limit = Math.max(1, Math.min(options.limit ?? 20, 100));
+    const cursor = Math.max(0, options.cursor ?? 0);
+    const sessions = this.#sessions.list().sort((left, right) => this.#sessionTimestamp(right).localeCompare(this.#sessionTimestamp(left)));
+    const page = sessions.slice(cursor, cursor + limit).map((session) => {
+      const packageDocument = this.#importer.loadPackage(session.package_id);
+      const integrity = this.inspectSession(session.session_id);
+      const currentSession = this.#sessions.read(session.session_id);
+      if (integrity.status === "QUARANTINED") {
+        return {
+          session_id: session.session_id,
+          state: currentSession.state,
+          objective: packageDocument.session_intent.objective,
+          target_skills: packageDocument.target_skills,
+          started_at: null,
+          completed_at: null,
+          submissions: [],
+          artifacts: [],
+          corrections: [],
+          reveal: null,
+          integrity: { status: "QUARANTINED" },
+        };
+      }
+      const events = this.#events.read(session.session_id);
+      const result = this.#sessions.readResult(session.session_id);
+      const artifacts = this.#artifacts.listForSession(session.session_id).map((metadata) => ({
+        artifact_id: metadata.artifact_id,
+        artifact_type: metadata.artifact_type,
+        created_at: metadata.created_at,
+        content_hash: metadata.content_hash,
+        text: this.#artifacts.loadText(metadata.artifact_id),
+      }));
+      return {
+        session_id: session.session_id,
+        state: currentSession.state,
+        objective: packageDocument.session_intent.objective,
+        target_skills: packageDocument.target_skills,
+        started_at: events[0]?.timestamp ?? null,
+        completed_at: result?.completed_at ?? null,
+        submissions: events.filter((event) => event.event_type === "answer_submitted").map((event) => ({
+          activity_id: event.activity_id,
+          response_kind: event.payload.response_kind,
+          ...(event.payload.option_ids === undefined ? {} : { option_ids: event.payload.option_ids }),
+          ...(event.payload.text_value === undefined ? {} : { text: event.payload.text_value }),
+          evidence_ref: event.event_id,
+        })),
+        artifacts,
+        corrections: result?.corrections ?? [],
+        reveal: currentSession.state === "COMPLETED" && integrity.status === "AUTHORITATIVE" && this.#learningTimezone.read() !== undefined ? this.reveal(session.session_id) : null,
+        integrity: { status: integrity.status },
+      };
+    });
+    return { items: page, next_cursor: cursor + page.length < sessions.length ? cursor + page.length : null };
+  }
+
+  workspaceInformation(): WorkspaceInformationProjection {
+    const timezone = this.#learningTimezone.read();
+    const currentEpoch = timezone?.epochs.find((epoch) => epoch.timezone_epoch_id === timezone.timezone_epoch_id);
+    return {
+      data_location: this.#workspace.root,
+      learning_timezone: timezone === undefined || currentEpoch === undefined ? null : {
+        learning_timezone: timezone.learning_timezone,
+        timezone_epoch_id: timezone.timezone_epoch_id,
+        effective_from: currentEpoch.effective_from,
+        created_at: currentEpoch.created_at,
+      },
+      local_only: true,
+    };
+  }
+
   evaluateReinforcement(sessionId: string): ReturnType<ReinforcementEngine["evaluate"]> {
     return this.#reinforcement.evaluate(sessionId);
   }
@@ -404,6 +649,40 @@ export class Band8Runtime {
       artifacts,
       configured.source_activity_ids,
     );
+  }
+
+  exportCheckpointDownload(sessionId: string): Document {
+    const exported = this.exportCheckpoint(sessionId);
+    const bundleDirectory = dirname(exported.bundlePath);
+    const records = (exported.bundle.records as Document[]).map((record) => {
+      const target = resolve(bundleDirectory, record.relative_path as string);
+      const inside = relative(this.#workspace.root, target);
+      if (inside === "" || inside.startsWith("..") || resolve(this.#workspace.root, inside) !== target) {
+        throw new Error("Coach bundle record resolved outside the Runtime workspace");
+      }
+      const bytes = readFileSync(target);
+      const actualHash = record.record_kind === "training_package"
+        ? canonicalHash(parseJsonStrict(bytes.toString("utf8")))
+        : `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+      if (actualHash !== record.content_hash) throw new Error("Coach bundle record hash verification failed");
+      const { relative_path: _relativePath, ...safeRecord } = record;
+      return {
+        ...safeRecord,
+        media_type: record.record_kind === "raw_event_stream" ? "application/x-ndjson" : record.record_kind === "learner_artifact" ? "text/plain; charset=utf-8" : "application/json",
+        content: bytes.toString("utf8"),
+      };
+    });
+    const { manifest_ref: _manifestRef, records: _recordReferences, ...coachBundle } = exported.bundle;
+    return {
+      schema_version: "0.1.0",
+      api_version: "v1",
+      bundle_type: "band8_coach_download",
+      trust_classification: "DATA_ONLY",
+      checkpoint_id: exported.bundle.checkpoint_id,
+      coach_bundle: coachBundle,
+      checkpoint_manifest: parseJsonStrict(readFileSync(exported.manifestPath, "utf8")),
+      records,
+    };
   }
 
   attachContinuation(priorSessionId: string, packageText: string): { status: "ATTACHED" | "IDEMPOTENT"; sessionId: string; packageId: string } {
@@ -525,6 +804,43 @@ export class Band8Runtime {
 
   getSession(sessionId: string): SessionMetadata {
     return this.#sessions.read(sessionId);
+  }
+
+  #coachProductStatus(): CoachProductStatus {
+    return this.coachStatus().status as CoachProductStatus;
+  }
+
+  #currentProductSession(): SessionMetadata | undefined {
+    const sessions = this.#sessions.list();
+    const leaves = sessions.filter((candidate) => !sessions.some((item) => item.prior_session_id === candidate.session_id));
+    const rank: Record<SessionMetadata["state"], number> = {
+      QUARANTINED: 7,
+      AWAITING_COACH: 6,
+      RUNNING: 5,
+      SUSPENDED: 4,
+      READY: 3,
+      CREATED: 2,
+      COMPLETED: 1,
+      ABORTED: 0,
+    };
+    return leaves.sort((left, right) => rank[right.state] - rank[left.state] || this.#sessionTimestamp(right).localeCompare(this.#sessionTimestamp(left)))[0];
+  }
+
+  #latestUnstartedPackage(): ImportRecord | undefined {
+    const used = new Set(this.#sessions.list().map((session) => session.package_id));
+    return this.#importer.list()
+      .filter((record) => !used.has(record.package_id))
+      .sort((left, right) => right.imported_at.localeCompare(left.imported_at) || right.package_id.localeCompare(left.package_id))[0];
+  }
+
+  #sessionTimestamp(session: SessionMetadata): string {
+    try {
+      return this.#sessions.readResult(session.session_id)?.completed_at
+        ?? this.#events.read(session.session_id).at(-1)?.timestamp
+        ?? this.#importer.record(session.package_id).imported_at;
+    } catch {
+      return this.#importer.record(session.package_id).imported_at;
+    }
   }
 
   #append(session: SessionMetadata, packageDocument: Document, eventType: string, activityId: string | null, payload: Document): Document {
