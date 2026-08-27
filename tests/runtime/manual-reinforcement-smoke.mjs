@@ -30,6 +30,7 @@ const dependencies = {
 const hashFile = (path) => createHash("sha256").update(readFileSync(path)).digest("hex");
 
 const runtime = Band8Runtime.open({ repositoryRoot, workspacePath, ...dependencies });
+runtime.configureLearningTimezone("Asia/Shanghai");
 runtime.importPackage(JSON.stringify(packageA));
 const priorSessionId = "session-phase1c-writing-a";
 runtime.createSession(packageA.package_id, priorSessionId);

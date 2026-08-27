@@ -12,6 +12,8 @@ The workspace owns two Phase 1C boundaries:
 
 - `reinforcement/decisions/` contains immutable, protocol-valid `PATTERN_BROKEN` historical awards and later qualification updates.
 - `reinforcement/qualifications/` contains atomically replaceable current qualification projections.
+- `settings/learning-timezone.json` contains the current learning timezone and immutable epoch history.
+- `reinforcement/learning-days/` contains immutable Runtime-derived session-to-learning-day identities.
 
 Only `PATTERN_BROKEN` is persisted as a B8TP reinforcement decision because the frozen `0.1.0` schema permits only `reward_type = pattern_broken`. `SESSION_COMPLETE`, `MISSION_ADVANCED`, `TRANSFER_CONFIRMED`, `RETENTION_CONFIRMED`, `STREAK_EXTENDED`, and objective-only `PERSONAL_BEST` are Runtime projections. They have stable identities derived from policy version, event type, and sorted evidence references through RFC 8785 JCS plus SHA-256, so restart, result rebuild, and repeated CLI evaluation cannot create a second semantic event.
 
@@ -33,9 +35,9 @@ The mission also carries a read-only goal projection copied from the valid packa
 
 ## Effective day and streak
 
-Policy `0.1.0` uses a UTC calendar-day boundary. A day qualifies only when a completed authoritative, non-anomalous session contains legitimate learner submission evidence. Login, app open, instruction-only activity, quarantine, replayed session identity, and clock-anomalous evidence do not count. Multiple qualifying sessions on the same UTC day contribute one effective day.
+Policy `0.1.0` uses the learner-confirmed IANA learning timezone. A day qualifies only when a completed authoritative, non-anomalous session contains legitimate learner submission evidence. Login, app open, instruction-only activity, quarantine, replayed session identity, and clock-anomalous evidence do not count. Multiple qualifying sessions with the same `timezone_epoch_id + local_calendar_date` identity contribute one effective day.
 
-The projection reports current streak, best streak, total effective days, and the exact day keys. A gap ends only the current streak; it never deletes achievements, lowers skill evidence, or changes best/total history. Streak means continuity of qualifying training, not mastery or English improvement. Recovery tokens are deferred because policy `0.1.0` has no frozen deterministic, abuse-resistant rule for them.
+An explicit timezone change appends a new epoch. Existing session day records are never recomputed, current streak cannot cross the epoch boundary, and best streak plus total effective days remain historical aggregates. The projection reports current streak, best streak, total effective days, and exact epoch-qualified day keys. A gap ends only the current streak; it never deletes achievements, lowers skill evidence, or changes best/total history. Streak means continuity of qualifying training, not mastery or English improvement. Recovery tokens are deferred because policy `0.1.0` has no frozen deterministic, abuse-resistant rule for them.
 
 ## Eligibility rules
 
@@ -44,7 +46,7 @@ The projection reports current streak, best streak, total effective days, and th
 - `TRANSFER_CONFIRMED`: a successful relevant objective observation on transfer material plus a trustworthy, strictly earlier same-skill observation with a different resource hash. The transfer hash must not have appeared in earlier same-skill observations, so repeating the same resource cannot farm the event. Changed hash is a minimal proxy, not a scientific claim of complete transfer.
 - `RETENTION_CONFIRMED`: successful same-skill evidence at least 86,400 seconds after earlier successful evidence, with no clock anomaly. Twenty-four hours is only the minimum delayed boundary and never mastery.
 - `PATTERN_BROKEN`: two failures from different earlier sessions for one skill/error-pattern identity; a later targeted intervention; two successful improvements from different sessions; a separate successful retrieval at least 86,400 seconds after the intervention; successful changed-material transfer; and no unresolved contradictory assessment at award time.
-- `STREAK_EXTENDED`: the target session creates a new qualifying UTC effective day.
+- `STREAK_EXTENDED`: the target session creates a new qualifying learning-timezone effective-day identity.
 - `PERSONAL_BEST`: available only when a comparable objective metric with identical measurement semantics exists. The current categorical result model does not fabricate one.
 
 The reveal model selects one primary event and orders support as `PATTERN_BROKEN`, objective `PERSONAL_BEST`, `RETENTION_CONFIRMED`, `TRANSFER_CONFIRMED`, `MISSION_ADVANCED`, `STREAK_EXTENDED`, then `SESSION_COMPLETE`. It carries event objects, evidence references, and any qualification change; terminal formatting and animation are outside the domain contract.

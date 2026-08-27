@@ -6,6 +6,11 @@ import { describe, expect, it } from "vitest";
 import { projectMission } from "../../src/reinforcement/mission.js";
 import { projectEffectiveStreak } from "../../src/reinforcement/streak.js";
 import type { AuthoritativeSessionEvidence } from "../../src/reinforcement/types.js";
+import type {
+  LearningDayRecord,
+  LearningTimezoneEpoch,
+  LearningTimezoneSettings,
+} from "../../src/storage/learning-timezone-store.js";
 
 type Document = Record<string, any>;
 
@@ -130,19 +135,55 @@ describe("current mission projection", () => {
 });
 
 describe("effective training streak", () => {
-  it("counts one authoritative participating day once and ignores login-like, duplicate, quarantined, and anomalous evidence", () => {
-    const dayOne = evidence("one", "2026-08-25T10:00:00.000Z");
-    const sameDay = evidence("two", "2026-08-25T20:00:00.000Z");
-    const dayTwo = evidence("three", "2026-08-26T10:00:00.000Z");
-    const loginOnly = evidence("login", "2026-08-27T10:00:00.000Z", { hasLegitimateParticipation: false });
-    const anomalous = evidence("anomaly", "2026-08-27T11:00:00.000Z", { clockAnomaly: true });
+  function epoch(id: string, timeZone: string, effectiveFrom: string): LearningTimezoneEpoch {
+    return {
+      timezone_epoch_id: id,
+      learning_timezone: timeZone,
+      effective_from: effectiveFrom,
+      created_at: effectiveFrom,
+    };
+  }
 
-    const projection = projectEffectiveStreak([dayOne, sameDay, dayTwo, dayOne, loginOnly, anomalous], "2026-08-27T12:00:00.000Z");
+  function settings(...epochs: LearningTimezoneEpoch[]): LearningTimezoneSettings {
+    const current = epochs.at(-1)!;
+    return {
+      version: 1,
+      learning_timezone: current.learning_timezone,
+      timezone_epoch_id: current.timezone_epoch_id,
+      epochs,
+    };
+  }
+
+  function learningDay(sessionId: string, currentEpoch: LearningTimezoneEpoch, localDate: string): LearningDayRecord {
+    return {
+      version: 1,
+      session_id: sessionId,
+      completed_at: `${localDate}T12:00:00.000Z`,
+      timezone_epoch_id: currentEpoch.timezone_epoch_id,
+      learning_timezone: currentEpoch.learning_timezone,
+      local_calendar_date: localDate,
+      learning_day_id: `${currentEpoch.timezone_epoch_id}:${localDate}`,
+      created_at: `${localDate}T12:01:00.000Z`,
+    };
+  }
+
+  it("counts each stable learning-day identity once", () => {
+    const current = epoch("timezone-epoch-shanghai", "Asia/Shanghai", "2026-08-20T00:00:00.000Z");
+    const dayOne = learningDay("session-one", current, "2026-08-25");
+    const sameDay = learningDay("session-two", current, "2026-08-25");
+    const dayTwo = learningDay("session-three", current, "2026-08-26");
+
+    const projection = projectEffectiveStreak([dayOne, sameDay, dayTwo, dayOne], "2026-08-27T12:00:00.000Z", settings(current));
 
     expect(projection).toEqual({
       policy_version: "0.1.0",
-      day_boundary: "UTC",
-      effective_days: ["2026-08-25", "2026-08-26"],
+      day_boundary: "LEARNING_TIMEZONE",
+      learning_timezone: "Asia/Shanghai",
+      timezone_epoch_id: "timezone-epoch-shanghai",
+      effective_days: [
+        { learning_day_id: "timezone-epoch-shanghai:2026-08-25", timezone_epoch_id: "timezone-epoch-shanghai", local_calendar_date: "2026-08-25" },
+        { learning_day_id: "timezone-epoch-shanghai:2026-08-26", timezone_epoch_id: "timezone-epoch-shanghai", local_calendar_date: "2026-08-26" },
+      ],
       current_streak: 2,
       best_streak: 2,
       total_effective_days: 2,
@@ -150,23 +191,34 @@ describe("effective training streak", () => {
   });
 
   it("ends only the current streak after a gap while preserving best and total history", () => {
+    const current = epoch("timezone-epoch-los-angeles", "America/Los_Angeles", "2026-08-19T00:00:00.000Z");
     const projection = projectEffectiveStreak([
-      evidence("one", "2026-08-20T10:00:00.000Z"),
-      evidence("two", "2026-08-21T10:00:00.000Z"),
-      evidence("three", "2026-08-23T10:00:00.000Z"),
-    ], "2026-08-27T12:00:00.000Z");
+      learningDay("session-one", current, "2026-08-20"),
+      learningDay("session-two", current, "2026-08-21"),
+      learningDay("session-three", current, "2026-08-23"),
+    ], "2026-08-27T12:00:00.000Z", settings(current));
 
     expect(projection.current_streak).toBe(0);
     expect(projection.best_streak).toBe(2);
     expect(projection.total_effective_days).toBe(3);
   });
 
-  it("normalizes RFC 3339 offsets to the UTC day boundary", () => {
+  it("starts a new current streak epoch without deleting historical best or total days", () => {
+    const first = epoch("timezone-epoch-shanghai", "Asia/Shanghai", "2026-08-20T00:00:00.000Z");
+    const second = epoch("timezone-epoch-los-angeles", "America/Los_Angeles", "2026-08-27T00:00:00.000Z");
     const projection = projectEffectiveStreak([
-      evidence("offset", "2026-08-27T00:30:00+08:00"),
-      evidence("utc", "2026-08-26T18:00:00Z"),
-    ], "2026-08-27T00:00:00Z");
-    expect(projection.effective_days).toEqual(["2026-08-26"]);
-    expect(projection.total_effective_days).toBe(1);
+      learningDay("session-old-one", first, "2026-08-25"),
+      learningDay("session-old-two", first, "2026-08-26"),
+      learningDay("session-new", second, "2026-08-26"),
+    ], "2026-08-27T12:00:00.000Z", settings(first, second));
+
+    expect(projection.current_streak).toBe(1);
+    expect(projection.best_streak).toBe(2);
+    expect(projection.total_effective_days).toBe(3);
+    expect(projection.effective_days.map((day) => day.learning_day_id)).toEqual([
+      "timezone-epoch-shanghai:2026-08-25",
+      "timezone-epoch-shanghai:2026-08-26",
+      "timezone-epoch-los-angeles:2026-08-26",
+    ]);
   });
 });

@@ -1,6 +1,7 @@
 import type { ProtocolValidator } from "../protocol/validator.js";
 import type { PackageImporter } from "../storage/package-importer.js";
 import type { ReinforcementStore } from "../storage/reinforcement-store.js";
+import type { LearningTimezoneStore } from "../storage/learning-timezone-store.js";
 import type { SessionStore } from "../storage/session-store.js";
 import type { AppendOnlyEventStore } from "../storage/event-store.js";
 import { collectAuthoritativeEvidence } from "./evidence.js";
@@ -22,6 +23,7 @@ interface ReinforcementEngineOptions {
   sessions: SessionStore;
   events: AppendOnlyEventStore;
   store: ReinforcementStore;
+  learningTimezone: LearningTimezoneStore;
   inspectSession: (sessionId: string) => { status: string };
 }
 
@@ -47,6 +49,14 @@ export class ReinforcementEngine {
     const latestEvidenceAt = evidence.map((item) => item.completedAt)
       .sort((left, right) => Date.parse(left) - Date.parse(right)).at(-1) ?? targetEvidence.completedAt;
     const evaluatedAt = Date.parse(now) < Date.parse(latestEvidenceAt) ? latestEvidenceAt : now;
+    const timezone = this.options.learningTimezone.read();
+    if (timezone === undefined) throw new Error("learning timezone is not configured");
+    const learningDays = evidence
+      .filter((session) => session.hasLegitimateParticipation && !session.clockAnomaly)
+      .map((session) => this.options.learningTimezone.assignLearningDay({
+        sessionId: session.sessionId,
+        completedAt: session.completedAt,
+      }));
     const currentQualification = historical === undefined
       ? undefined
       : this.options.store.readQualification(
@@ -58,6 +68,8 @@ export class ReinforcementEngine {
       learnerId: this.options.learnerId,
       targetSessionId: sessionId,
       sessions: evidence,
+      learningDays,
+      learningTimezone: timezone,
       evaluatedAt,
       ...(historical === undefined ? {} : { existingHistoricalAward: historical }),
       ...(currentQualification === undefined ? {} : { existingCurrentQualification: currentQualification }),
@@ -76,7 +88,7 @@ export class ReinforcementEngine {
     return {
       ...evaluation,
       mission: projectMission(packageDocument, { state: targetSource.session.state as string }, targetEvidence, evaluation.currentQualification),
-      streak: projectEffectiveStreak(evidence, evaluatedAt),
+      streak: projectEffectiveStreak(learningDays, evaluatedAt, timezone),
     };
   }
 

@@ -15,6 +15,7 @@ interface CliDependencies {
   read?: (prompt: string) => Promise<string>;
   eventIdFactory?: () => string;
   artifactIdFactory?: () => string;
+  timezoneEpochIdFactory?: () => string;
   now?: () => string;
 }
 
@@ -42,11 +43,18 @@ function parseArguments(argumentsList: string[]): ParsedArguments {
   const sessionId = takeOption(remaining, "--session");
   const [command, ...targets] = remaining;
   if (workspace === undefined || command === undefined || targets.length === 0) {
-    throw new Error("usage: band8 --workspace <path> <validate|import|run|checkpoint|continue|reinforce|reveal|mission> <target...> [--protected <path>] [--session <id>]");
+    throw new Error("usage: band8 --workspace <path> <validate|import|run|checkpoint|continue|reinforce|reveal|mission|timezone> <target...> [--protected <path>] [--session <id>]");
   }
-  if (!["validate", "import", "run", "checkpoint", "continue", "reinforce", "reveal", "mission"].includes(command)) throw new Error(`unknown command: ${command}`);
-  const expectedTargets = command === "continue" || command === "reinforce" ? 2 : 1;
-  if (targets.length !== expectedTargets) throw new Error(`${command} requires ${expectedTargets} target argument(s)`);
+  if (!["validate", "import", "run", "checkpoint", "continue", "reinforce", "reveal", "mission", "timezone"].includes(command)) throw new Error(`unknown command: ${command}`);
+  if (command === "timezone") {
+    const operation = targets[0];
+    if (operation === "get" && targets.length !== 1) throw new Error("timezone get requires no value");
+    if (["set", "change"].includes(operation ?? "") && targets.length !== 2) throw new Error(`timezone ${operation} requires one value`);
+    if (!["get", "set", "change"].includes(operation ?? "")) throw new Error(`unknown timezone operation: ${operation ?? ""}`);
+  } else {
+    const expectedTargets = command === "continue" || command === "reinforce" ? 2 : 1;
+    if (targets.length !== expectedTargets) throw new Error(`${command} requires ${expectedTargets} target argument(s)`);
+  }
   return {
     workspace: resolve(workspace),
     command,
@@ -87,9 +95,23 @@ export async function executeCli(argumentsList: string[], dependencies: CliDepen
     workspacePath: parsed.workspace,
     ...(dependencies.eventIdFactory === undefined ? {} : { eventIdFactory: dependencies.eventIdFactory }),
     ...(dependencies.artifactIdFactory === undefined ? {} : { artifactIdFactory: dependencies.artifactIdFactory }),
+    ...(dependencies.timezoneEpochIdFactory === undefined ? {} : { timezoneEpochIdFactory: dependencies.timezoneEpochIdFactory }),
     ...(dependencies.now === undefined ? {} : { now: dependencies.now }),
   };
   const runtime = Band8Runtime.open(runtimeOptions);
+  if (parsed.command === "timezone") {
+    const operation = parsed.targets[0]!;
+    if (operation === "get") {
+      const settings = runtime.learningTimezone();
+      write(settings === undefined ? "UNCONFIGURED" : canonicalJson(settings));
+      return 0;
+    }
+    const epoch = operation === "set"
+      ? runtime.configureLearningTimezone(parsed.targets[1]!)
+      : runtime.changeLearningTimezone(parsed.targets[1]!);
+    write(`${operation === "set" ? "CONFIGURED" : "CHANGED"} ${epoch.learning_timezone} ${epoch.timezone_epoch_id}`);
+    return 0;
+  }
   if (parsed.command === "reinforce") {
     if (parsed.targets[0] !== "evaluate") throw new Error("reinforce requires the evaluate operation");
     write(canonicalJson(runtime.evaluateReinforcement(parsed.targets[1]!)));

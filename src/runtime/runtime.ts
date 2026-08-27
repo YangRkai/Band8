@@ -8,6 +8,11 @@ import { CoachExchange, type ContinuationBinding } from "../storage/coach-exchan
 import { AppendOnlyEventStore, type EventContext } from "../storage/event-store.js";
 import { PackageImporter } from "../storage/package-importer.js";
 import { ReinforcementStore } from "../storage/reinforcement-store.js";
+import {
+  LearningTimezoneStore,
+  type LearningTimezoneEpoch,
+  type LearningTimezoneSettings,
+} from "../storage/learning-timezone-store.js";
 import { SessionStore, type SessionMetadata } from "../storage/session-store.js";
 import { initializeWorkspace } from "../storage/workspace.js";
 import { continuationSessionId, priorEvidenceFingerprint } from "./continuation.js";
@@ -26,6 +31,7 @@ export interface RuntimeOptions {
   artifactIdFactory?: () => string;
   now?: () => string;
   learnerId?: string;
+  timezoneEpochIdFactory?: () => string;
 }
 
 export type InspectionStatus = "AUTHORITATIVE" | "VALID_INCOMPLETE" | "REBUILD_REQUIRED" | "QUARANTINED";
@@ -46,6 +52,7 @@ export class Band8Runtime {
   readonly #coach: CoachExchange;
   readonly #events: AppendOnlyEventStore;
   readonly #reinforcement: ReinforcementEngine;
+  readonly #learningTimezone: LearningTimezoneStore;
   readonly #now: () => string;
   readonly #artifactIdFactory: () => string;
 
@@ -66,6 +73,11 @@ export class Band8Runtime {
       () => ({ artifacts: this.#artifacts.metadataById(), artifactRoot: this.#artifacts.root }),
     );
     const reinforcementStore = new ReinforcementStore(workspace, this.#validator);
+    this.#learningTimezone = new LearningTimezoneStore(
+      workspace,
+      this.#now,
+      options.timezoneEpochIdFactory ?? (() => `timezone-epoch-${randomUUID()}`),
+    );
     this.#reinforcement = new ReinforcementEngine({
       learnerId: options.learnerId ?? "learner-local-default",
       now: this.#now,
@@ -74,6 +86,7 @@ export class Band8Runtime {
       sessions: this.#sessions,
       events: this.#events,
       store: reinforcementStore,
+      learningTimezone: this.#learningTimezone,
       inspectSession: (sessionId) => this.inspectSession(sessionId),
     });
   }
@@ -338,6 +351,18 @@ export class Band8Runtime {
 
   events(sessionId: string): Document[] {
     return this.#events.read(sessionId);
+  }
+
+  learningTimezone(): LearningTimezoneSettings | undefined {
+    return this.#learningTimezone.read();
+  }
+
+  configureLearningTimezone(timeZone: string): LearningTimezoneEpoch {
+    return this.#learningTimezone.configure(timeZone);
+  }
+
+  changeLearningTimezone(timeZone: string): LearningTimezoneEpoch {
+    return this.#learningTimezone.change(timeZone);
   }
 
   evaluateReinforcement(sessionId: string): ReturnType<ReinforcementEngine["evaluate"]> {

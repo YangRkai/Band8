@@ -25,6 +25,32 @@ afterEach(() => {
 });
 
 describe("headless CLI harness", () => {
+  it("configures and explicitly changes the Runtime learning timezone", async () => {
+    const path = workspace();
+    const output: string[] = [];
+    const epochIds = ["timezone-epoch-cli-one", "timezone-epoch-cli-two"];
+    let instant = "2026-08-26T00:00:00.000Z";
+    const dependencies = {
+      repositoryRoot,
+      write: (value: string) => output.push(value),
+      now: () => instant,
+      timezoneEpochIdFactory: () => epochIds.shift()!,
+    };
+
+    expect(await executeCli(["--workspace", path, "timezone", "get"], dependencies)).toBe(0);
+    expect(output.pop()).toBe("UNCONFIGURED");
+    expect(await executeCli(["--workspace", path, "timezone", "set", "Asia/Shanghai"], dependencies)).toBe(0);
+    expect(output.pop()).toBe("CONFIGURED Asia/Shanghai timezone-epoch-cli-one");
+    instant = "2026-08-27T00:00:00.000Z";
+    expect(await executeCli(["--workspace", path, "timezone", "change", "America/Los_Angeles"], dependencies)).toBe(0);
+    expect(output.pop()).toBe("CHANGED America/Los_Angeles timezone-epoch-cli-two");
+    expect(await executeCli(["--workspace", path, "timezone", "get"], dependencies)).toBe(0);
+    expect(JSON.parse(output.pop()!)).toMatchObject({
+      learning_timezone: "America/Los_Angeles",
+      timezone_epoch_id: "timezone-epoch-cli-two",
+    });
+  });
+
   it("validates and imports a package through the runtime boundary", async () => {
     const path = workspace();
     const output: string[] = [];
@@ -46,6 +72,7 @@ describe("headless CLI harness", () => {
       eventIdFactory: () => `event-cli-${++event}`,
       now: () => "2026-08-26T14:00:00.000Z",
     };
+    await executeCli(["--workspace", path, "timezone", "set", "UTC"], dependencies);
     await executeCli(["--workspace", path, "import", packagePath, "--protected", protectedPath], dependencies);
     const answers = ["", "", "true", "not-given"];
     dependencies.read = async () => answers.shift() ?? "";

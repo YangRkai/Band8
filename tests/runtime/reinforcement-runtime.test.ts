@@ -38,13 +38,15 @@ function hashFile(path: string): string {
 function runtime(path: string): Band8Runtime {
   let event = 0;
   let second = 0;
-  return Band8Runtime.open({
+  const instance = Band8Runtime.open({
     repositoryRoot,
     workspacePath: path,
     learnerId: "learner-runtime",
     eventIdFactory: () => `event-reinforcement-${++event}`,
     now: () => new Date(Date.UTC(2026, 7, 27, 10, 0, second++)).toISOString(),
   });
+  if (instance.learningTimezone() === undefined) instance.configureLearningTimezone("UTC");
+  return instance;
 }
 
 function completeReading(instance: Band8Runtime, sessionId: string): void {
@@ -151,6 +153,56 @@ describe("reinforcement decision store", () => {
 });
 
 describe("Runtime reinforcement API", () => {
+  it("preserves historical days while a timezone change starts a new current streak epoch", () => {
+    const path = workspace();
+    let instant = Date.parse("2026-08-26T00:00:00.000Z");
+    let tick = 0;
+    let event = 0;
+    const epochIds = ["timezone-epoch-shanghai", "timezone-epoch-los-angeles"];
+    const instance = Band8Runtime.open({
+      repositoryRoot,
+      workspacePath: path,
+      learnerId: "learner-timezone-runtime",
+      eventIdFactory: () => `event-timezone-${++event}`,
+      now: () => new Date(instant + tick++ * 1_000).toISOString(),
+      timezoneEpochIdFactory: () => epochIds.shift()!,
+    });
+
+    expect(instance.learningTimezone()).toBeUndefined();
+    instance.configureLearningTimezone("Asia/Shanghai");
+    instant = Date.parse("2026-08-27T12:00:00.000Z");
+    tick = 0;
+    completeReading(instance, "session-timezone-old-one");
+    instance.evaluateReinforcement("session-timezone-old-one");
+    instant = Date.parse("2026-08-28T12:00:00.000Z");
+    tick = 0;
+    completeReading(instance, "session-timezone-old-two");
+    const beforeChange = instance.evaluateReinforcement("session-timezone-old-two");
+
+    expect(beforeChange.streak.current_streak).toBe(2);
+    expect(beforeChange.streak.best_streak).toBe(2);
+    expect(beforeChange.streak.total_effective_days).toBe(2);
+
+    instant = Date.parse("2026-08-29T00:00:00.000Z");
+    tick = 0;
+    instance.changeLearningTimezone("America/Los_Angeles");
+    instant = Date.parse("2026-08-29T12:00:00.000Z");
+    tick = 0;
+    completeReading(instance, "session-timezone-new-one");
+    const afterChange = instance.evaluateReinforcement("session-timezone-new-one");
+    const repeated = instance.evaluateReinforcement("session-timezone-new-one");
+
+    expect(afterChange.streak.current_streak).toBe(1);
+    expect(afterChange.streak.best_streak).toBe(2);
+    expect(afterChange.streak.total_effective_days).toBe(3);
+    expect(afterChange.streak.effective_days.map((day: Document) => day.learning_day_id)).toEqual([
+      "timezone-epoch-shanghai:2026-08-27",
+      "timezone-epoch-shanghai:2026-08-28",
+      "timezone-epoch-los-angeles:2026-08-29",
+    ]);
+    expect(repeated.streak).toEqual(afterChange.streak);
+  });
+
   it("is restart and rebuild stable and never mutates raw events or results", () => {
     const path = workspace();
     let instance = runtime(path);

@@ -98,6 +98,7 @@ describe("real Runtime PATTERN_BROKEN chain", () => {
         ...common,
         now: () => new Date(Date.parse(timestamp) + second++ * 1000).toISOString(),
       });
+      if (runtime.learningTimezone() === undefined) runtime.configureLearningTimezone("UTC");
       const documents = fixture(suffix, evidenceClass, intent, material);
       runtime.importPackage(documents.packageText, documents.protectedText);
       const sessionId = `session-runtime-pattern-${suffix}`;

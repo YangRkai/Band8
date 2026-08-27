@@ -1,6 +1,7 @@
 import { reinforcementIdentity } from "./identity.js";
 import { projectEffectiveStreak } from "./streak.js";
-import { compareTimestamps, epochMilliseconds, utcDay } from "./time.js";
+import { compareTimestamps, epochMilliseconds } from "./time.js";
+import type { LearningDayRecord, LearningTimezoneSettings } from "../storage/learning-timezone-store.js";
 import type {
   AuthoritativeSessionEvidence,
   Document,
@@ -15,6 +16,8 @@ export interface PolicyInput {
   learnerId: string;
   targetSessionId: string;
   sessions: AuthoritativeSessionEvidence[];
+  learningDays: LearningDayRecord[];
+  learningTimezone: LearningTimezoneSettings;
   evaluatedAt: string;
   existingHistoricalAward?: Document;
   existingCurrentQualification?: Document;
@@ -267,10 +270,17 @@ export function evaluatePolicy(input: PolicyInput): ReinforcementEvaluation {
   }
   if (retentionEvidence.length > 0) eligible.push(event("RETENTION_CONFIRMED", retentionEvidence));
 
-  const streak = projectEffectiveStreak(sessions, input.evaluatedAt);
-  const targetDay = utcDay(target.completedAt);
-  const priorSameDay = prior.some((session) => utcDay(session.completedAt) === targetDay && session.hasLegitimateParticipation && !session.clockAnomaly);
-  if (usable && streak.effective_days.includes(targetDay) && !priorSameDay) eligible.push(event("STREAK_EXTENDED", [target.completionEvidenceRef]));
+  const includedSessions = new Set(sessions.map((session) => session.sessionId));
+  const learningDays = input.learningDays.filter((record) => includedSessions.has(record.session_id));
+  const streak = projectEffectiveStreak(learningDays, input.evaluatedAt, input.learningTimezone);
+  const targetDay = learningDays.find((record) => record.session_id === target.sessionId);
+  const priorSessions = new Set(prior.map((session) => session.sessionId));
+  const priorSameDay = targetDay !== undefined && learningDays.some((record) => (
+    priorSessions.has(record.session_id) && record.learning_day_id === targetDay.learning_day_id
+  ));
+  if (usable && targetDay !== undefined && streak.effective_days.some((day) => day.learning_day_id === targetDay.learning_day_id) && !priorSameDay) {
+    eligible.push(event("STREAK_EXTENDED", [target.completionEvidenceRef]));
+  }
   else rejected.push({ event_type: "STREAK_EXTENDED", reason: priorSameDay ? "effective_day_already_counted" : "effective_day_not_qualified" });
 
   rejected.push({ event_type: "PERSONAL_BEST", reason: "no_comparable_objective_metric" });

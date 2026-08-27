@@ -25,7 +25,7 @@ function workspace(): string {
 function open(path: string, artifactIds: string[] = []): Band8Runtime {
   let event = 0;
   let second = 0;
-  return Band8Runtime.open({
+  const runtime = Band8Runtime.open({
     repositoryRoot,
     workspacePath: path,
     learnerId: "learner-golden",
@@ -33,6 +33,8 @@ function open(path: string, artifactIds: string[] = []): Band8Runtime {
     artifactIdFactory: () => artifactIds.shift() ?? "artifact-unexpected",
     now: () => new Date(Date.UTC(2026, 7, 27, 12, 0, second++)).toISOString(),
   });
+  if (runtime.learningTimezone() === undefined) runtime.configureLearningTimezone("UTC");
+  return runtime;
 }
 
 afterEach(() => {

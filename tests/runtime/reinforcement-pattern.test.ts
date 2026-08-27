@@ -3,8 +3,13 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { evaluatePolicy } from "../../src/reinforcement/policy.js";
+import { evaluatePolicy as evaluateRuntimePolicy, type PolicyInput } from "../../src/reinforcement/policy.js";
 import type { AuthoritativeSessionEvidence, Document } from "../../src/reinforcement/types.js";
+import { testLearningCalendar } from "./helpers/learning-timezone.js";
+
+function evaluatePolicy(input: Omit<PolicyInput, "learningDays" | "learningTimezone">): ReturnType<typeof evaluateRuntimePolicy> {
+  return evaluateRuntimePolicy({ ...input, ...testLearningCalendar(input.sessions) });
+}
 
 const fixture = JSON.parse(readFileSync(
   resolve(process.cwd(), "tests/runtime/fixtures/reinforcement/pattern-chain.json"),

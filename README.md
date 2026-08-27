@@ -13,7 +13,7 @@ Current stage:
 
 Phase 1C — Evidence-Driven Reinforcement Engine.
 
-The current headless Node.js/TypeScript kernel preserves the Phase 1A and Phase 1B1 paths and adds deterministic mission, effective-day/streak, evidence-backed reveal, transfer/retention eligibility, and frozen `PATTERN_BROKEN 0.1.0` decisions with historical/current qualification separation. Reinforcement never rewrites raw evidence, Coach inference, or assessment truth, and the Runtime does not call an AI model or assign subjective IELTS scores.
+The current headless Node.js/TypeScript kernel preserves the Phase 1A and Phase 1B1 paths and adds deterministic mission, learning-timezone effective-day/streak, evidence-backed reveal, transfer/retention eligibility, and frozen `PATTERN_BROKEN 0.1.0` decisions with historical/current qualification separation. Learning timezone changes create immutable epochs without re-keying historical days. Reinforcement never rewrites raw evidence, Coach inference, or assessment truth, and the Runtime does not call an AI model or assign subjective IELTS scores.
 
 See [Phase 1A Runtime](docs/runtime/PHASE1A_RUNTIME.md) for local commands and storage guarantees.
 See [Phase 1B1 Writing Coach Loop](docs/runtime/PHASE1B1_WRITING_COACH_LOOP.md) for the artifact, checkpoint, continuation, and trust boundaries.

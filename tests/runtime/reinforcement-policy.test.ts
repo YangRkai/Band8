@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { reinforcementIdentity } from "../../src/reinforcement/identity.js";
-import { evaluatePolicy } from "../../src/reinforcement/policy.js";
+import { evaluatePolicy as evaluateRuntimePolicy, type PolicyInput } from "../../src/reinforcement/policy.js";
 import type { AuthoritativeSessionEvidence } from "../../src/reinforcement/types.js";
+import { testLearningCalendar } from "./helpers/learning-timezone.js";
+
+function evaluatePolicy(input: Omit<PolicyInput, "learningDays" | "learningTimezone">): ReturnType<typeof evaluateRuntimePolicy> {
+  return evaluateRuntimePolicy({ ...input, ...testLearningCalendar(input.sessions) });
+}
 
 function session(
   id: string,
