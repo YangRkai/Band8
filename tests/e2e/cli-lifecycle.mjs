@@ -29,7 +29,8 @@ export async function verifyCliLifecycle() {
     }
     const response = await fetch(`http://127.0.0.1:${port}/api/v1/today`);
     if (response.status !== 200) throw new Error(`band8 serve health returned ${response.status}`);
-    child.kill(process.platform === "win32" ? "SIGTERM" : "SIGINT");
+    const shutdownSignal = process.platform === "win32" ? "SIGTERM" : "SIGINT";
+    child.kill(shutdownSignal);
     await Promise.race([
       new Promise((resolveExit, rejectExit) => {
         child.once("exit", resolveExit);
@@ -40,7 +41,9 @@ export async function verifyCliLifecycle() {
     let stopped = false;
     try { await fetch(`http://127.0.0.1:${port}/api/v1/today`); } catch { stopped = true; }
     if (!stopped) throw new Error("band8 serve port remained reachable after shutdown");
-    process.stdout.write("CLI lifecycle: startup, HTTP, shutdown, and port release passed\n");
+    process.stdout.write(process.platform === "win32"
+      ? "CLI lifecycle: startup, HTTP, Windows forced child termination, child exit, and port release passed\n"
+      : `CLI lifecycle: startup, HTTP, ${shutdownSignal}, graceful child exit, and port release passed\n`);
   } finally {
     if (child.exitCode === null) child.kill("SIGKILL");
     rmSync(workspacePath, { recursive: true, force: true });

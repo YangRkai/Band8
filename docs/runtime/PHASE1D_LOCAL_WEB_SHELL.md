@@ -20,7 +20,7 @@ The server:
 - binds `127.0.0.1` only and chooses a free port unless `--port` is provided;
 - serves only built local assets and `/api/v1/` DTOs;
 - rejects mutating requests without exact Host, Origin, JSON content type, and the startup-scoped local session token;
-- applies route-specific JSON limits (4 KiB settings, 16 KiB session/export controls, 1 MiB learner responses, and 4 MiB package/continuation imports) and stable safe error DTOs;
+- applies route-specific JSON limits (4 KiB settings, 16 KiB session/export controls, 64 KiB learner responses, and the frozen 1 MiB B8TP limit for package/continuation imports) and stable safe error DTOs;
 - exposes no arbitrary path, URL-fetch, shell, or dynamic-code endpoint;
 - emits no wildcard CORS and loads no external fonts, scripts, images, or APIs.
 
@@ -28,7 +28,7 @@ The server:
 
 The primary navigation is Today, Train, Progress, History, and Coach. Settings is secondary. Train renders only `INSTRUCTION`, `PRESENT_TEXT`, `SELECT`, and `TEXT_RESPONSE`; all content remains escaped plain text. Coach bundle export and continuation validation remain Runtime operations.
 
-The Runtime turns its Phase 1B outbox references into a hash-verified, self-contained `band8_coach_download` DTO for browser download. The browser does not assemble or validate Coach evidence. Settings is the one intentionally scoped API surface that shows the active Runtime workspace path, because Phase 1D explicitly requires a local data-location entry; no endpoint accepts a path or reads an arbitrary path supplied by the browser.
+The Runtime turns its Phase 1B outbox references into a hash-verified, self-contained `band8_coach_download` DTO for browser download. The browser does not assemble or validate Coach evidence. Settings reports only the non-sensitive `LOCAL_RUNTIME_WORKSPACE` storage mode; the absolute workspace path remains available to the local CLI operator and is never serialized to the browser.
 
 ## Verification
 

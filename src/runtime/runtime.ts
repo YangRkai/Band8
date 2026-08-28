@@ -10,6 +10,7 @@ import { CoachExchange, type ContinuationBinding } from "../storage/coach-exchan
 import { AppendOnlyEventStore, type EventContext } from "../storage/event-store.js";
 import { PackageImporter, type ImportRecord } from "../storage/package-importer.js";
 import { ReinforcementStore } from "../storage/reinforcement-store.js";
+import { ProductSelectionStore } from "../storage/product-selection-store.js";
 import {
   LearningTimezoneStore,
   type LearningTimezoneEpoch,
@@ -24,11 +25,15 @@ import { projectReveal } from "../reinforcement/reveal.js";
 import { projectLearnerActivity } from "./projection.js";
 import { deriveSessionResult } from "./result.js";
 import { transitionState } from "./state-machine.js";
+import { validatePortableCoachBundle } from "./portable-coach-bundle.js";
 import { projectEffectiveStreak } from "../reinforcement/streak.js";
 import { projectMission } from "../reinforcement/mission.js";
+import type { CoachExportResponse, HistoryCorrectionDto, SubmitActivityResponse } from "../product-api/dto.js";
 import {
   BAND8_IELTS_GOAL,
   projectIeltsGoal,
+  projectProductMission,
+  projectProductReveal,
   type CoachProductStatus,
   type CoachProjection,
   type HistoryOptions,
@@ -71,6 +76,7 @@ export class Band8Runtime {
   readonly #reinforcement: ReinforcementEngine;
   readonly #reinforcementStore: ReinforcementStore;
   readonly #learningTimezone: LearningTimezoneStore;
+  readonly #productSelection: ProductSelectionStore;
   readonly #workspace: RuntimeWorkspace;
   readonly #now: () => string;
   readonly #artifactIdFactory: () => string;
@@ -99,6 +105,7 @@ export class Band8Runtime {
       this.#now,
       options.timezoneEpochIdFactory ?? (() => `timezone-epoch-${randomUUID()}`),
     );
+    this.#productSelection = new ProductSelectionStore(workspace);
     this.#reinforcement = new ReinforcementEngine({
       learnerId: options.learnerId ?? "learner-local-default",
       now: this.#now,
@@ -117,9 +124,18 @@ export class Band8Runtime {
   }
 
   importPackage(packageText: string, protectedText?: string): ReturnType<PackageImporter["importFromText"]> {
-    return protectedText === undefined
+    const imported = protectedText === undefined
       ? this.#importer.importFromText(packageText)
       : this.#importer.importFromText(packageText, protectedText);
+    const selected = this.#productSelection.read();
+    const selectedSession = selected?.active_session_id === null || selected?.active_session_id === undefined || !this.#sessions.exists(selected.active_session_id)
+      ? undefined
+      : this.#sessions.read(selected.active_session_id);
+    if (selectedSession === undefined || !["CREATED", "READY", "RUNNING", "AWAITING_COACH", "SUSPENDED"].includes(selectedSession.state)) {
+      const packageDocument = this.#importer.loadPackage(imported.packageId);
+      this.#productSelection.selectPackage(imported.packageId, String(packageDocument.run_id), this.#importer.record(imported.packageId).imported_at);
+    }
+    return imported;
   }
 
   createSession(packageId: string, sessionId: string): SessionMetadata {
@@ -137,6 +153,7 @@ export class Band8Runtime {
     this.#sessions.write(created);
     const ready = { ...created, state: transitionState(created.state, "READY") };
     this.#sessions.write(ready);
+    this.#productSelection.selectSession(ready.session_id, ready.run_id, this.#sessionTimestamp(ready));
     return ready;
   }
 
@@ -151,6 +168,7 @@ export class Band8Runtime {
     });
     const running = { ...session, state: transitionState(session.state, "RUNNING") };
     this.#sessions.write(running);
+    this.#productSelection.selectSession(running.session_id, running.run_id, this.#sessionTimestamp(running));
     return running;
   }
 
@@ -366,7 +384,9 @@ export class Band8Runtime {
     }
     if (suspended.state !== "SUSPENDED") throw new Error(`session cannot resume from ${suspended.state}`);
     this.#append(suspended, packageDocument, "session_resumed", null, { resume_operation_id: operationId });
-    this.#sessions.write({ ...suspended, state: transitionState(suspended.state, "RUNNING") });
+    const running = { ...suspended, state: transitionState(suspended.state, "RUNNING") };
+    this.#sessions.write(running);
+    this.#productSelection.selectSession(running.session_id, running.run_id, this.#sessionTimestamp(running));
     return { status: "RESUMED" };
   }
 
@@ -387,14 +407,13 @@ export class Band8Runtime {
   }
 
   today(): TodayProjection {
+    const completed = this.#authoritativeCompletedSessions()
+      .sort((left, right) => this.#sessionTimestamp(left).localeCompare(this.#sessionTimestamp(right)));
     const packages = this.#importer.list();
     const session = this.#currentProductSession();
     const unstarted = this.#latestUnstartedPackage();
     const projectUnstarted = unstarted !== undefined && (session === undefined || ["COMPLETED", "ABORTED", "QUARANTINED"].includes(session.state));
     const timezone = this.#learningTimezone.read();
-    const completed = this.#sessions.list()
-      .filter((candidate) => candidate.state === "COMPLETED")
-      .sort((left, right) => this.#sessionTimestamp(left).localeCompare(this.#sessionTimestamp(right)));
     const latestCompleted = completed.at(-1);
     const packageDocument = projectUnstarted
       ? this.#importer.loadPackage(unstarted.package_id)
@@ -403,14 +422,14 @@ export class Band8Runtime {
       empty: packages.length === 0,
       goal: projectIeltsGoal(packageDocument?.learner_goal as Document | undefined),
       mission: projectUnstarted
-        ? projectMission(packageDocument!, { state: "READY" })
-        : session === undefined ? null : this.mission(session.session_id),
+        ? projectProductMission(projectMission(packageDocument!, { state: "READY" }))
+        : session === undefined ? null : projectProductMission(this.mission(session.session_id)),
       effective_streak: timezone === undefined ? null : projectEffectiveStreak(
         this.#learningTimezone.listLearningDays(),
         this.#now(),
         timezone,
       ),
-      last_reveal: latestCompleted === undefined || timezone === undefined ? null : this.reveal(latestCompleted.session_id),
+      last_reveal: latestCompleted === undefined || timezone === undefined ? null : projectProductReveal(this.reveal(latestCompleted.session_id)),
       coach_status: this.#coachProductStatus(),
       primary_action: packages.length === 0
         ? "GO_TO_COACH"
@@ -441,7 +460,7 @@ export class Band8Runtime {
       state: session.state,
       activity_number: Math.min(session.current_activity_index + 1, packageDocument.activities.length),
       activity_count: packageDocument.activities.length,
-      mission: this.mission(session.session_id),
+      mission: projectProductMission(this.mission(session.session_id)),
       current_activity: session.state === "RUNNING" ? this.currentActivity(session.session_id) : null,
       integrity: session.state === "QUARANTINED" ? { status: this.inspectSession(session.session_id).status } : { status: "OK" },
     };
@@ -451,8 +470,8 @@ export class Band8Runtime {
     let session: SessionMetadata;
     if (sessionId !== undefined) session = this.#sessions.read(sessionId);
     else {
-      const active = this.#sessions.list().find((candidate) => ["READY", "RUNNING", "SUSPENDED"].includes(candidate.state));
-      if (active !== undefined) session = active;
+      const active = this.#currentProductSession();
+      if (active !== undefined && !["COMPLETED", "ABORTED", "QUARANTINED"].includes(active.state)) session = active;
       else {
         const selected = packageId ?? this.#latestUnstartedPackage()?.package_id;
         if (selected === undefined) throw new Error("no training package is imported");
@@ -462,10 +481,11 @@ export class Band8Runtime {
     if (session.state === "READY") this.startSession(session.session_id);
     else if (session.state === "SUSPENDED") this.resumeSession(session.session_id, `resume-${randomUUID()}`);
     else if (session.state !== "RUNNING") throw new Error(`session cannot begin training from ${session.state}`);
+    this.#productSelection.selectSession(session.session_id, session.run_id, this.#sessionTimestamp(session));
     return this.training()!;
   }
 
-  submitCurrentActivity(sessionId: string, response?: { optionIds?: string[]; text?: string }): Document {
+  submitCurrentActivity(sessionId: string, response?: { optionIds?: string[]; text?: string }): SubmitActivityResponse {
     const activity = this.currentActivity(sessionId);
     const beforeArtifacts = new Set(this.#artifacts.listForSession(sessionId).map((item) => item.artifact_id as string));
     const completion = this.completeCurrentActivity(sessionId, response);
@@ -478,18 +498,20 @@ export class Band8Runtime {
         created_at: item.created_at,
       }));
     const objective = completion.result?.objective_results?.find((item: Document) => item.activity_id === activity.activity_id) as Document | undefined;
-    const payload: Document = {
+    const training = this.training();
+    if (training === null) throw new Error("completed activity has no training projection");
+    const payload: SubmitActivityResponse = {
       state: completion.state,
       submission: {
         activity_id: activity.activity_id,
         ...(objective?.outcome === undefined ? {} : { outcome: objective.outcome, evidence_refs: objective.evidence_refs }),
       },
       artifacts: createdArtifacts,
-      training: this.training(),
+      training,
     };
     if (completion.state === "COMPLETED") {
       payload.reinforcement = this.evaluateReinforcement(sessionId);
-      payload.reveal = this.reveal(sessionId);
+      payload.reveal = projectProductReveal(this.reveal(sessionId));
     }
     if (completion.state === "AWAITING_COACH") payload.coach = this.coachStatus();
     return payload;
@@ -516,16 +538,21 @@ export class Band8Runtime {
   }
 
   progress(): ProgressProjection {
+    const completed = this.#authoritativeCompletedSessions();
+    const activeSession = this.#currentProductSession();
+    const activeUnstarted = this.#latestUnstartedPackage();
+    const activePackage = activeUnstarted !== undefined
+      ? this.#importer.loadPackage(activeUnstarted.package_id)
+      : activeSession === undefined ? undefined : this.#importer.loadPackage(activeSession.package_id);
     const sessions = this.#sessions.list();
     const leaves = sessions.filter((candidate) => !sessions.some((item) => item.prior_session_id === candidate.session_id));
-    const completed = sessions.filter((session) => session.state === "COMPLETED");
     const latest = completed.sort((left, right) => this.#sessionTimestamp(left).localeCompare(this.#sessionTimestamp(right))).at(-1);
     const reinforcement = latest === undefined || this.#learningTimezone.read() === undefined
       ? undefined
       : this.evaluateReinforcement(latest.session_id);
     return {
-      goal: projectIeltsGoal(BAND8_IELTS_GOAL),
-      missions: leaves.map((session) => this.mission(session.session_id)),
+      goal: projectIeltsGoal(activePackage?.learner_goal ?? BAND8_IELTS_GOAL),
+      missions: leaves.map((session) => projectProductMission(this.mission(session.session_id))),
       validated_qualifications: this.#reinforcementStore.listQualifications().map((qualification) => ({
         skill_id: qualification.skill_id as string,
         error_pattern_id: qualification.error_pattern_id as string,
@@ -553,7 +580,7 @@ export class Band8Runtime {
           session_id: session.session_id,
           state: currentSession.state,
           objective: packageDocument.session_intent.objective,
-          target_skills: packageDocument.target_skills,
+          target_skills: (packageDocument.target_skills as unknown[]).map(String),
           started_at: null,
           completed_at: null,
           submissions: [],
@@ -566,29 +593,37 @@ export class Band8Runtime {
       const events = this.#events.read(session.session_id);
       const result = this.#sessions.readResult(session.session_id);
       const artifacts = this.#artifacts.listForSession(session.session_id).map((metadata) => ({
-        artifact_id: metadata.artifact_id,
-        artifact_type: metadata.artifact_type,
-        created_at: metadata.created_at,
-        content_hash: metadata.content_hash,
+        artifact_id: String(metadata.artifact_id),
+        artifact_type: String(metadata.artifact_type),
+        created_at: String(metadata.created_at),
+        content_hash: String(metadata.content_hash),
         text: this.#artifacts.loadText(metadata.artifact_id),
       }));
+      const corrections: HistoryCorrectionDto[] = Array.isArray(result?.corrections)
+        ? result.corrections.map((correction: Document) => ({
+            ...(correction.activity_id === undefined ? {} : { activity_id: String(correction.activity_id) }),
+            ...(correction.initial_outcome === undefined ? {} : { initial_outcome: String(correction.initial_outcome) }),
+            ...(correction.revised_outcome === undefined ? {} : { revised_outcome: String(correction.revised_outcome) }),
+            ...(Array.isArray(correction.evidence_refs) ? { evidence_refs: correction.evidence_refs.map(String) } : {}),
+          }))
+        : [];
       return {
         session_id: session.session_id,
         state: currentSession.state,
         objective: packageDocument.session_intent.objective,
-        target_skills: packageDocument.target_skills,
+        target_skills: (packageDocument.target_skills as unknown[]).map(String),
         started_at: events[0]?.timestamp ?? null,
         completed_at: result?.completed_at ?? null,
         submissions: events.filter((event) => event.event_type === "answer_submitted").map((event) => ({
           activity_id: event.activity_id,
-          response_kind: event.payload.response_kind,
-          ...(event.payload.option_ids === undefined ? {} : { option_ids: event.payload.option_ids }),
-          ...(event.payload.text_value === undefined ? {} : { text: event.payload.text_value }),
-          evidence_ref: event.event_id,
+          response_kind: String(event.payload.response_kind),
+          ...(event.payload.option_ids === undefined ? {} : { option_ids: (event.payload.option_ids as unknown[]).map(String) }),
+          ...(event.payload.text_value === undefined ? {} : { text: String(event.payload.text_value) }),
+          evidence_ref: String(event.event_id),
         })),
         artifacts,
-        corrections: result?.corrections ?? [],
-        reveal: currentSession.state === "COMPLETED" && integrity.status === "AUTHORITATIVE" && this.#learningTimezone.read() !== undefined ? this.reveal(session.session_id) : null,
+        corrections,
+        reveal: currentSession.state === "COMPLETED" && integrity.status === "AUTHORITATIVE" && this.#learningTimezone.read() !== undefined ? projectProductReveal(this.reveal(session.session_id)) : null,
         integrity: { status: integrity.status },
       };
     });
@@ -599,14 +634,15 @@ export class Band8Runtime {
     const timezone = this.#learningTimezone.read();
     const currentEpoch = timezone?.epochs.find((epoch) => epoch.timezone_epoch_id === timezone.timezone_epoch_id);
     return {
-      data_location: this.#workspace.root,
+      storage: "LOCAL_RUNTIME_WORKSPACE",
+      storage_mode: "LOCAL_ONLY",
+      export_available: true,
       learning_timezone: timezone === undefined || currentEpoch === undefined ? null : {
         learning_timezone: timezone.learning_timezone,
         timezone_epoch_id: timezone.timezone_epoch_id,
         effective_from: currentEpoch.effective_from,
         created_at: currentEpoch.created_at,
       },
-      local_only: true,
     };
   }
 
@@ -651,10 +687,20 @@ export class Band8Runtime {
     );
   }
 
-  exportCheckpointDownload(sessionId: string): Document {
+  exportCheckpointDownload(sessionId: string): CoachExportResponse {
     const exported = this.exportCheckpoint(sessionId);
     const bundleDirectory = dirname(exported.bundlePath);
-    const records = (exported.bundle.records as Document[]).map((record) => {
+    const stringField = (document: Document, field: string): string => {
+      const value = document[field];
+      if (typeof value !== "string") throw new Error(`Coach export ${field} must be a string`);
+      return value;
+    };
+    const stringArray = (document: Document, field: string): string[] => {
+      const value = document[field];
+      if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) throw new Error(`Coach export ${field} must be a string array`);
+      return [...value] as string[];
+    };
+    const records: CoachExportResponse["records"] = (exported.bundle.records as Document[]).map((record) => {
       const target = resolve(bundleDirectory, record.relative_path as string);
       const inside = relative(this.#workspace.root, target);
       if (inside === "" || inside.startsWith("..") || resolve(this.#workspace.root, inside) !== target) {
@@ -665,24 +711,60 @@ export class Band8Runtime {
         ? canonicalHash(parseJsonStrict(bytes.toString("utf8")))
         : `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
       if (actualHash !== record.content_hash) throw new Error("Coach bundle record hash verification failed");
-      const { relative_path: _relativePath, ...safeRecord } = record;
+      const recordKind = stringField(record, "record_kind");
+      if (!(["training_package", "raw_event_stream", "learner_artifact"] as const).some((value) => value === recordKind)) {
+        throw new Error("Coach export record_kind is unsupported");
+      }
+      if (stringField(record, "trust_classification") !== "data") throw new Error("Coach export record is not DATA-only");
       return {
-        ...safeRecord,
-        media_type: record.record_kind === "raw_event_stream" ? "application/x-ndjson" : record.record_kind === "learner_artifact" ? "text/plain; charset=utf-8" : "application/json",
+        record_id: stringField(record, "record_id"),
+        record_kind: recordKind as "training_package" | "raw_event_stream" | "learner_artifact",
+        protocol_version: stringField(record, "protocol_version"),
+        producer: stringField(record, "producer"),
+        trust_classification: "data",
+        content_hash: stringField(record, "content_hash"),
+        media_type: recordKind === "raw_event_stream" ? "application/x-ndjson" : recordKind === "learner_artifact" ? "text/plain; charset=utf-8" : "application/json",
         content: bytes.toString("utf8"),
       };
     });
-    const { manifest_ref: _manifestRef, records: _recordReferences, ...coachBundle } = exported.bundle;
-    return {
+    const contractVersionsDocument = exported.bundle.contract_versions as Document;
+    const contractVersions = Object.fromEntries(Object.entries(contractVersionsDocument).map(([name, value]) => {
+      if (typeof value !== "string") throw new Error(`Coach export contract version ${name} must be a string`);
+      return [name, value];
+    }));
+    const manifest = parseJsonStrict(readFileSync(exported.manifestPath, "utf8")) as Document;
+    return validatePortableCoachBundle({
       schema_version: "0.1.0",
       api_version: "v1",
       bundle_type: "band8_coach_download",
       trust_classification: "DATA_ONLY",
-      checkpoint_id: exported.bundle.checkpoint_id,
-      coach_bundle: coachBundle,
-      checkpoint_manifest: parseJsonStrict(readFileSync(exported.manifestPath, "utf8")),
+      checkpoint_id: stringField(exported.bundle, "checkpoint_id"),
+      coach_bundle: {
+        bundle_type: "band8_coach_input",
+        checkpoint_id: stringField(exported.bundle, "checkpoint_id"),
+        protocol_version: stringField(exported.bundle, "protocol_version"),
+        schema_version: stringField(exported.bundle, "schema_version"),
+        trust_classification: "DATA_ONLY",
+        trust_contract: stringField(exported.bundle, "trust_contract"),
+        relevant_activity_refs: stringArray(exported.bundle, "relevant_activity_refs"),
+        contract_versions: contractVersions,
+      },
+      checkpoint_manifest: {
+        checkpoint_id: stringField(manifest, "checkpoint_id"),
+        checkpoint_reason: stringField(manifest, "checkpoint_reason"),
+        created_at: stringField(manifest, "created_at"),
+        package_hash: stringField(manifest, "package_hash"),
+        package_id: stringField(manifest, "package_id"),
+        protocol_version: stringField(manifest, "protocol_version"),
+        required_evidence_refs: stringArray(manifest, "required_evidence_refs"),
+        run_id: stringField(manifest, "run_id"),
+        schema_version: stringField(manifest, "schema_version"),
+        segment_id: stringField(manifest, "segment_id"),
+        session_id: stringField(manifest, "session_id"),
+        status: stringField(manifest, "status"),
+      },
       records,
-    };
+    });
   }
 
   attachContinuation(priorSessionId: string, packageText: string): { status: "ATTACHED" | "IDEMPOTENT"; sessionId: string; packageId: string } {
@@ -750,6 +832,10 @@ export class Band8Runtime {
       if (priorSession.continuation_session_id !== existing.continuation_session_id) {
         this.#sessions.write({ ...priorSession, continuation_session_id: existing.continuation_session_id });
       }
+      if (this.#sessions.exists(existing.continuation_session_id)) {
+        const child = this.#sessions.read(existing.continuation_session_id);
+        this.#productSelection.selectSession(child.session_id, child.run_id, this.#sessionTimestamp(child));
+      }
       return { status, sessionId: existing.continuation_session_id, packageId: existing.continuation_package_id };
     }
     for (const record of this.#importer.list()) {
@@ -778,6 +864,8 @@ export class Band8Runtime {
     }
     const status = this.#coach.bind(binding);
     this.#sessions.write({ ...priorSession, continuation_session_id: childSessionId });
+    const selectedChild = this.#sessions.read(childSessionId);
+    this.#productSelection.selectSession(selectedChild.session_id, selectedChild.run_id, this.#sessionTimestamp(selectedChild));
     return { status, sessionId: childSessionId, packageId: continuationPackage.package_id };
   }
 
@@ -813,24 +901,64 @@ export class Band8Runtime {
   #currentProductSession(): SessionMetadata | undefined {
     const sessions = this.#sessions.list();
     const leaves = sessions.filter((candidate) => !sessions.some((item) => item.prior_session_id === candidate.session_id));
-    const rank: Record<SessionMetadata["state"], number> = {
-      QUARANTINED: 7,
-      AWAITING_COACH: 6,
-      RUNNING: 5,
-      SUSPENDED: 4,
-      READY: 3,
-      CREATED: 2,
-      COMPLETED: 1,
-      ABORTED: 0,
-    };
-    return leaves.sort((left, right) => rank[right.state] - rank[left.state] || this.#sessionTimestamp(right).localeCompare(this.#sessionTimestamp(left)))[0];
+    const leafIds = new Set(leaves.map((session) => session.session_id));
+    const runnableStates = new Set<SessionMetadata["state"]>(["CREATED", "READY", "RUNNING", "AWAITING_COACH", "SUSPENDED"]);
+    const deterministic = (values: SessionMetadata[]): SessionMetadata[] => values.sort((left, right) => (
+      this.#sessionTimestamp(right).localeCompare(this.#sessionTimestamp(left))
+      || left.session_id.localeCompare(right.session_id)
+    ));
+    const unstarted = this.#unstartedPackages();
+    const selected = this.#productSelection.read();
+    if (selected?.active_session_id !== null && selected?.active_session_id !== undefined && this.#sessions.exists(selected.active_session_id)) {
+      const session = this.#sessions.read(selected.active_session_id);
+      if (session.continuation_session_id !== undefined && this.#sessions.exists(session.continuation_session_id)) {
+        const continuation = this.#sessions.read(session.continuation_session_id);
+        if (leafIds.has(continuation.session_id) && runnableStates.has(continuation.state)) {
+          this.#productSelection.selectSession(continuation.session_id, continuation.run_id, this.#sessionTimestamp(continuation));
+          return continuation;
+        }
+      }
+      if (leafIds.has(session.session_id) && runnableStates.has(session.state)) return session;
+      if (leafIds.has(session.session_id) && ["COMPLETED", "ABORTED"].includes(session.state) && unstarted.length === 0) return session;
+    }
+    if (selected?.active_package_id !== null && selected?.active_package_id !== undefined) {
+      const activePackage = unstarted.find((record) => record.package_id === selected.active_package_id);
+      if (activePackage !== undefined) return undefined;
+    }
+    const runnable = deterministic(leaves.filter((session) => runnableStates.has(session.state)))[0];
+    if (runnable !== undefined) {
+      this.#productSelection.selectSession(runnable.session_id, runnable.run_id, this.#sessionTimestamp(runnable));
+      return runnable;
+    }
+    const packageRecord = unstarted[0];
+    if (packageRecord !== undefined) {
+      const packageDocument = this.#importer.loadPackage(packageRecord.package_id);
+      this.#productSelection.selectPackage(packageRecord.package_id, String(packageDocument.run_id), packageRecord.imported_at);
+      return undefined;
+    }
+    const terminal = deterministic(leaves.filter((session) => ["COMPLETED", "ABORTED"].includes(session.state)))[0];
+    if (terminal !== undefined) {
+      this.#productSelection.selectSession(terminal.session_id, terminal.run_id, this.#sessionTimestamp(terminal));
+      return terminal;
+    }
+    this.#productSelection.clear("1970-01-01T00:00:00.000Z");
+    return deterministic(leaves.filter((session) => session.state === "QUARANTINED"))[0];
   }
 
   #latestUnstartedPackage(): ImportRecord | undefined {
+    const unstarted = this.#unstartedPackages();
+    const selected = this.#productSelection.read();
+    if (selected?.active_package_id !== null && selected?.active_package_id !== undefined) {
+      return unstarted.find((record) => record.package_id === selected.active_package_id);
+    }
+    return selected?.active_session_id === null || selected?.active_session_id === undefined ? unstarted[0] : undefined;
+  }
+
+  #unstartedPackages(): ImportRecord[] {
     const used = new Set(this.#sessions.list().map((session) => session.package_id));
     return this.#importer.list()
       .filter((record) => !used.has(record.package_id))
-      .sort((left, right) => right.imported_at.localeCompare(left.imported_at) || right.package_id.localeCompare(left.package_id))[0];
+      .sort((left, right) => right.imported_at.localeCompare(left.imported_at) || right.package_id.localeCompare(left.package_id));
   }
 
   #sessionTimestamp(session: SessionMetadata): string {
@@ -841,6 +969,13 @@ export class Band8Runtime {
     } catch {
       return this.#importer.record(session.package_id).imported_at;
     }
+  }
+
+  #authoritativeCompletedSessions(): SessionMetadata[] {
+    return this.#sessions.list()
+      .filter((session) => session.state === "COMPLETED")
+      .filter((session) => this.inspectSession(session.session_id).status === "AUTHORITATIVE")
+      .map((session) => this.#sessions.read(session.session_id));
   }
 
   #append(session: SessionMetadata, packageDocument: Document, eventType: string, activityId: string | null, payload: Document): Document {

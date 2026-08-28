@@ -1,9 +1,10 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { EventEmitter } from "node:events";
 import { join, resolve } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { executeCli } from "../../src/cli/index.js";
+import { executeCli, waitForServerShutdown } from "../../src/cli/index.js";
 import type { RunningBand8Server } from "../../src/server/server.js";
 import { storageKey } from "../../src/storage/workspace.js";
 
@@ -27,6 +28,28 @@ afterEach(() => {
 });
 
 describe("headless CLI harness", () => {
+  it("registers both shutdown signals, closes once, and removes its listeners", async () => {
+    const signals = new EventEmitter();
+    let closes = 0;
+    const running = {
+      host: "127.0.0.1" as const,
+      port: 43127,
+      url: "http://127.0.0.1:43127",
+      close: async () => { closes += 1; },
+    };
+    const shutdown = waitForServerShutdown(running, signals);
+
+    expect(signals.listenerCount("SIGINT")).toBe(1);
+    expect(signals.listenerCount("SIGTERM")).toBe(1);
+    signals.emit("SIGINT");
+    signals.emit("SIGTERM");
+    await shutdown;
+
+    expect(closes).toBe(1);
+    expect(signals.listenerCount("SIGINT")).toBe(0);
+    expect(signals.listenerCount("SIGTERM")).toBe(0);
+  });
+
   it("starts the loopback web shell with explicit no-open lifecycle options", async () => {
     const path = workspace();
     const output: string[] = [];

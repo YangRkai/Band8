@@ -51,6 +51,22 @@ afterEach(async () => {
 });
 
 describe("learner-safe product API", () => {
+  it("never serializes the absolute Runtime workspace root into learner-visible DTOs", async () => {
+    const { running, workspacePath } = await open();
+    const routes = ["today", "training", "progress", "history?limit=20", "coach", "settings"];
+    const payloads = await Promise.all(routes.map(async (route) => await (await fetch(`${running.url}/api/v1/${route}`)).json()));
+    const settings = payloads.at(-1);
+
+    expect(settings).toEqual({
+      storage: "LOCAL_RUNTIME_WORKSPACE",
+      storage_mode: "LOCAL_ONLY",
+      export_available: true,
+      learning_timezone: null,
+    });
+    expect(JSON.stringify(payloads)).not.toContain(workspacePath);
+    expect(JSON.stringify(payloads)).not.toMatch(/[A-Za-z]:\\\\|data_location|workspace_root/iu);
+  });
+
   it("projects a truthful first-run empty Today without fabricating training", async () => {
     const { running } = await open();
     const response = await fetch(`${running.url}/api/v1/today`);

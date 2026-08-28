@@ -15,5 +15,5 @@
     "strict": true,
     "noUncheckedIndexedAccess": true
   },
-  "include": ["src"]
+  "include": ["src", "../src/product-api/**/*.ts"]
 }

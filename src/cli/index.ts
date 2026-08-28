@@ -24,6 +24,11 @@ interface CliDependencies {
   now?: () => string;
 }
 
+interface ShutdownSignalTarget {
+  once(event: "SIGINT" | "SIGTERM", listener: () => void): unknown;
+  off(event: "SIGINT" | "SIGTERM", listener: () => void): unknown;
+}
+
 interface ParsedArguments {
   workspace: string;
   command: string;
@@ -98,12 +103,15 @@ function openFixedLocalUrl(url: string): void {
   child.unref();
 }
 
-async function waitForServerShutdown(running: RunningBand8Server): Promise<void> {
+export async function waitForServerShutdown(
+  running: RunningBand8Server,
+  signalTarget: ShutdownSignalTarget = process,
+): Promise<void> {
   await new Promise<void>((resolveShutdown, reject) => {
     let stopping = false;
     const cleanup = () => {
-      process.off("SIGINT", stop);
-      process.off("SIGTERM", stop);
+      signalTarget.off("SIGINT", stop);
+      signalTarget.off("SIGTERM", stop);
     };
     const stop = () => {
       if (stopping) return;
@@ -111,8 +119,8 @@ async function waitForServerShutdown(running: RunningBand8Server): Promise<void>
       cleanup();
       running.close().then(resolveShutdown, reject);
     };
-    process.once("SIGINT", stop);
-    process.once("SIGTERM", stop);
+    signalTarget.once("SIGINT", stop);
+    signalTarget.once("SIGTERM", stop);
   });
 }
 

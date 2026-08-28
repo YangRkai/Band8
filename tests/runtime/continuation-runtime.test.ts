@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { Band8Runtime } from "../../src/runtime/runtime.js";
 import { continuationSessionId } from "../../src/runtime/continuation.js";
+import { validatePortableCoachBundle } from "../../src/runtime/portable-coach-bundle.js";
 import { storageKey } from "../../src/storage/workspace.js";
 
 type Document = Record<string, any>;
@@ -70,6 +71,41 @@ describe("External Coach file exchange", () => {
     expect(bundle.records.map((record: Document) => record.record_id)).toContain("artifact-writing-original-001");
     expect(runtime.readArtifactText("artifact-writing-original-001")).toBe(draft);
   });
+
+  it("validates one portable export after the original workspace is removed", () => {
+    const original = workspace();
+    const independent = workspace();
+    const runtime = checkpointRuntime(original);
+    const portablePath = join(independent, "coach-input.json");
+    writeFileSync(portablePath, JSON.stringify(runtime.exportCheckpointDownload("session-writing-prior")), "utf8");
+    rmSync(original, { recursive: true, force: true });
+
+    const copiedFileOnly = JSON.parse(readFileSync(portablePath, "utf8")) as unknown;
+    const validated = validatePortableCoachBundle(copiedFileOnly);
+    expect(validated.checkpoint_id).toBe("checkpoint-writing-001");
+    expect(validated.records.map((record) => record.record_kind)).toEqual([
+      "training_package",
+      "raw_event_stream",
+      "learner_artifact",
+    ]);
+    expect(JSON.stringify(validated)).not.toMatch(/correct_option_ids|scoring_rule|relative_path|manifest_ref|[A-Za-z]:\\\\/iu);
+  });
+
+  it("rejects portable exports whose manifest identity, package hash, or closed record fields are altered", () => {
+    const path = workspace();
+    const portable = checkpointRuntime(path).exportCheckpointDownload("session-writing-prior");
+    const changedPackageHash = structuredClone(portable);
+    changedPackageHash.checkpoint_manifest.package_hash = `sha256:${"0".repeat(64)}`;
+    expect(() => validatePortableCoachBundle(changedPackageHash)).toThrow(/package hash/iu);
+
+    const changedRun = structuredClone(portable);
+    changedRun.checkpoint_manifest.run_id = "run-unrelated";
+    expect(() => validatePortableCoachBundle(changedRun)).toThrow(/run|identity/iu);
+
+    const changedRecord = structuredClone(portable) as unknown as { records: Array<Record<string, unknown>> };
+    changedRecord.records[0]!.producer = 42;
+    expect(() => validatePortableCoachBundle(changedRecord)).toThrow(/producer/iu);
+  });
 });
 
 describe("continuation attachment", () => {
@@ -82,6 +118,7 @@ describe("continuation attachment", () => {
     const before = fileHash(eventPath);
 
     const attached = runtime.attachContinuation("session-writing-prior", packageBText);
+    expect(runtime.training()).toMatchObject({ session_id: attached.sessionId, package_id: "pkg-writing-checkpoint-b", state: "READY" });
     expect(attached.status).toBe("ATTACHED");
     expect(runtime.attachContinuation("session-writing-prior", packageBText)).toEqual({
       status: "IDEMPOTENT",
@@ -141,6 +178,7 @@ describe("continuation attachment", () => {
 
     const reopened = Band8Runtime.open({ repositoryRoot, workspacePath: path, ...deps });
     expect(reopened.continuation("session-writing-prior")).toMatchObject({ continuation_session_id: attached.sessionId });
+    expect(reopened.training()).toMatchObject({ session_id: attached.sessionId, package_id: "pkg-writing-checkpoint-b", state: "READY" });
     expect(reopened.events("session-writing-prior")).toHaveLength(priorEventCount);
     reopened.startSession(attached.sessionId);
     expect(reopened.currentActivity(attached.sessionId)).toMatchObject({

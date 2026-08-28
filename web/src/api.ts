@@ -1,5 +1,15 @@
-type Document = Record<string, any>;
-type JsonDto = Document | null;
+import type {
+  HistoryPageDto,
+  ProductApiGetMap,
+  ProductApiMutationMap,
+} from "../../src/product-api/dto.js";
+
+type GetRoute = keyof ProductApiGetMap;
+type HistoryRoute = `/api/v1/history?${string}`;
+type GetResponse<Path extends GetRoute | HistoryRoute> = Path extends HistoryRoute
+  ? HistoryPageDto
+  : Path extends GetRoute ? ProductApiGetMap[Path] : never;
+type MutationRoute = keyof ProductApiMutationMap;
 
 export class ApiError extends Error {
   constructor(readonly code: string, message: string) {
@@ -14,26 +24,40 @@ function sessionToken(): string {
   return token;
 }
 
-async function parse(response: Response): Promise<JsonDto> {
-  const value = await response.json() as JsonDto;
+function errorValue(value: unknown, key: "code" | "message", fallback: string): string {
+  if (value === null || typeof value !== "object" || !(key in value)) return fallback;
+  const field = key === "code"
+    ? (value as { code?: unknown }).code
+    : (value as { message?: unknown }).message;
+  return typeof field === "string" ? field : fallback;
+}
+
+async function parse<ResponseDto>(response: Response): Promise<ResponseDto> {
+  const value: unknown = await response.json();
   if (!response.ok) {
-    const error = value ?? {};
-    throw new ApiError(String(error.code ?? "REQUEST_REJECTED"), String(error.message ?? "Request rejected"));
+    throw new ApiError(
+      errorValue(value, "code", "REQUEST_REJECTED"),
+      errorValue(value, "message", "Request rejected"),
+    );
   }
-  return value;
+  return value as ResponseDto;
 }
 
-export async function getJson(path: string): Promise<JsonDto> {
-  return await parse(await fetch(path, { headers: { accept: "application/json" } }));
+export async function getJson<Path extends GetRoute | HistoryRoute>(path: Path): Promise<GetResponse<Path>> {
+  return await parse<GetResponse<Path>>(await fetch(path, { headers: { accept: "application/json" } }));
 }
 
-export async function postJson(path: string, value: Document): Promise<Document> {
-  const response = await parse(await postResponse(path, value));
-  if (response === null) throw new ApiError("INVALID_RESPONSE", "Band8 returned an empty mutation response.");
-  return response;
+export async function postJson<Path extends MutationRoute>(
+  path: Path,
+  value: ProductApiMutationMap[Path]["request"],
+): Promise<ProductApiMutationMap[Path]["response"]> {
+  return await parse<ProductApiMutationMap[Path]["response"]>(await postResponse(path, value));
 }
 
-export async function postResponse(path: string, value: Document): Promise<Response> {
+export async function postResponse<Path extends MutationRoute>(
+  path: Path,
+  value: ProductApiMutationMap[Path]["request"],
+): Promise<Response> {
   return await fetch(path, {
     method: "POST",
     headers: {

@@ -5,13 +5,15 @@ import { HttpError } from "./errors.js";
 export const BODY_LIMITS = {
   timezone: 4_096,
   session: 16_384,
-  textResponse: 1_048_576,
-  trainingPackage: 4_194_304,
-  coachContinuation: 4_194_304,
+  textResponse: 65_536,
+  trainingPackage: 1_048_576,
+  coachContinuation: 1_048_576,
   coachExport: 16_384,
 } as const;
 
-export async function readJsonBody(request: IncomingMessage, limit: number): Promise<Record<string, any>> {
+export type JsonRequestObject = { [key: string]: unknown };
+
+export async function readJsonBody(request: IncomingMessage, limit: number): Promise<JsonRequestObject> {
   const contentType = request.headers["content-type"]?.split(";", 1)[0]?.trim().toLowerCase();
   if (contentType !== "application/json") throw new HttpError(415, "JSON_REQUIRED", "Mutation requests require application/json");
   const declaredLength = request.headers["content-length"];
@@ -34,7 +36,7 @@ export async function readJsonBody(request: IncomingMessage, limit: number): Pro
   try {
     const value = JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
     if (value === null || typeof value !== "object" || Array.isArray(value)) throw new Error("JSON object required");
-    return value as Record<string, any>;
+    return value as JsonRequestObject;
   } catch {
     throw new HttpError(400, "INVALID_JSON", "Request body must be one valid JSON object");
   }

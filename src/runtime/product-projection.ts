@@ -1,14 +1,29 @@
-import type { EffectiveStreakProjection } from "../reinforcement/streak.js";
+import type {
+  CoachDto,
+  CoachStatus,
+  HistoryPageDto,
+  IeltsGoalDto,
+  MissionDto,
+  ProgressDto,
+  RevealDto,
+  SettingsDto,
+  TodayDto,
+  TrainingDto,
+} from "../product-api/dto.js";
 import type { MissionProjection } from "../reinforcement/mission.js";
 import type { RevealProjection } from "../reinforcement/reveal.js";
-import type { LearnerActivityView } from "./projection.js";
 
-type Document = Record<string, any>;
+type JsonObject = { [key: string]: unknown };
 
-export interface IeltsGoalProjection {
-  overall_target: number;
-  section_minimums: { listening: number; reading: number; writing: number; speaking: number };
+function object(value: unknown): JsonObject | undefined {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as JsonObject : undefined;
 }
+
+function finite(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+export type IeltsGoalProjection = IeltsGoalDto;
 
 export const BAND8_IELTS_GOAL = {
   overall_target: 8,
@@ -18,95 +33,94 @@ export const BAND8_IELTS_GOAL = {
     writing: 7.5,
     speaking: 7.5,
   },
-} as const;
+} as const satisfies IeltsGoalDto;
 
-export function projectIeltsGoal(value: Document | undefined): IeltsGoalProjection {
-  const goal = value ?? BAND8_IELTS_GOAL;
-  const sections = goal.section_minimums as Document;
+export function projectIeltsGoal(value: unknown): IeltsGoalDto {
+  const goal = object(value) ?? BAND8_IELTS_GOAL;
+  const sections = object(goal.section_minimums) ?? {};
+  const overall = finite(goal.overall_target);
+  if (overall === undefined) throw new Error("learner goal overall_target must be numeric");
+  const listening = finite(sections.listening);
+  const reading = finite(sections.reading);
+  const writing = finite(sections.writing);
+  const speaking = finite(sections.speaking);
   return {
-    overall_target: Number(goal.overall_target),
+    overall_target: overall,
     section_minimums: {
-      listening: Number(sections.listening),
-      reading: Number(sections.reading),
-      writing: Number(sections.writing),
-      speaking: Number(sections.speaking),
+      ...(listening === undefined ? {} : { listening }),
+      ...(reading === undefined ? {} : { reading }),
+      ...(writing === undefined ? {} : { writing }),
+      ...(speaking === undefined ? {} : { speaking }),
     },
   };
 }
 
-export type CoachProductStatus = "NO_PACKAGE" | "TRAINING_READY" | "REVIEW_REQUIRED" | "CONTINUATION_READY";
-
-export interface TodayProjection {
-  empty: boolean;
-  goal: IeltsGoalProjection;
-  mission: MissionProjection | null;
-  effective_streak: EffectiveStreakProjection | null;
-  last_reveal: RevealProjection | null;
-  coach_status: CoachProductStatus;
-  primary_action: "GO_TO_COACH" | "CONTINUE_TRAINING";
-}
-
-export interface TrainingProjection {
-  session_id: string | null;
-  package_id: string;
-  state: string;
-  activity_number: number;
-  activity_count: number;
-  mission: MissionProjection | null;
-  current_activity: LearnerActivityView | null;
-  integrity: { status: string };
-}
-
-export interface CoachProjection {
-  status: CoachProductStatus;
-  session_id?: string;
-  checkpoint_id?: string;
-  evidence_count?: number;
-  evidence_refs?: string[];
-  bundle_identity?: string;
-}
-
-export interface ProgressProjection {
-  goal: IeltsGoalProjection;
-  missions: MissionProjection[];
-  validated_qualifications: Array<{
-    skill_id: string;
-    error_pattern_id: string;
-    qualification: string;
-    evaluated_at: string;
-  }>;
-  retention: "CONFIRMED" | "EVIDENCE_PENDING";
-  transfer: "CONFIRMED" | "EVIDENCE_PENDING";
-  pattern_status: "PATTERN_BROKEN" | "NEEDS_REVALIDATION" | "EVIDENCE_PENDING";
-}
-
-export interface HistoryProjection {
-  items: Array<{
-    session_id: string;
-    state: string;
-    objective: string;
-    target_skills: string[];
-    started_at: string | null;
-    completed_at: string | null;
-    submissions: Document[];
-    artifacts: Document[];
-    corrections: Document[];
-    reveal: RevealProjection | null;
-    integrity: { status: string };
-  }>;
-  next_cursor: number | null;
-}
-
-export interface WorkspaceInformationProjection {
-  data_location: string;
-  learning_timezone: null | {
-    learning_timezone: string;
-    timezone_epoch_id: string;
-    effective_from: string;
-    created_at: string;
+export function projectProductMission(value: MissionProjection): MissionDto {
+  const goal = projectIeltsGoal(value.goal);
+  return {
+    mission_id: value.mission_id,
+    policy_version: value.policy_version,
+    run_id: value.run_id,
+    objective: value.objective,
+    target_skills: [...value.target_skills],
+    hypothesis_refs: [...value.hypothesis_refs],
+    status: value.status,
+    evidence_refs: [...value.evidence_refs],
+    goal: {
+      ...goal,
+      unresolved_blockers: [...value.goal.unresolved_blockers],
+      validated_qualifications: value.goal.validated_qualifications.map((qualification) => ({
+        skill_id: qualification.skill_id,
+        error_pattern_id: qualification.error_pattern_id,
+        qualification: qualification.qualification,
+      })),
+      assessment_evidence_refs: [...value.goal.assessment_evidence_refs],
+    },
   };
-  local_only: true;
 }
+
+export function projectProductReveal(value: RevealProjection): RevealDto {
+  const event = value.primary_event?.event_type ?? "SESSION_COMPLETE";
+  const qualification = value.qualification_change?.qualification;
+  const historicalPattern = event === "PATTERN_BROKEN" && qualification === "revoked";
+  const confirmedPattern = event === "PATTERN_BROKEN" && !historicalPattern;
+  return {
+    policy_version: value.policy_version,
+    session_id: value.session_id,
+    primary_event: value.primary_event,
+    supporting_events: value.supporting_events,
+    evidence_refs: value.evidence_refs,
+    qualification_change: qualification === undefined ? null : { qualification: String(qualification) },
+    presentation: historicalPattern
+      ? {
+          title: "PATTERN BROKEN — HISTORICAL",
+          message: "The historical award remains recorded.",
+          validation_label: "NEEDS REVALIDATION",
+          qualification_label: "CURRENT QUALIFICATION REVOKED",
+        }
+      : confirmedPattern
+        ? {
+            title: "PATTERN BROKEN",
+            message: "Confirmed through repeated correction, delayed retrieval, and changed-material transfer.",
+            validation_label: "QUALIFICATION CONFIRMED",
+            qualification_label: qualification === undefined ? null : `CURRENT QUALIFICATION ${String(qualification).toUpperCase()}`,
+          }
+        : {
+            title: event.replaceAll("_", " "),
+            message: "You improved this in the session. Stable transfer has not been independently proven.",
+            validation_label: "VALIDATION PENDING",
+            qualification_label: qualification === undefined ? null : `CURRENT QUALIFICATION ${String(qualification).toUpperCase()}`,
+          },
+  };
+}
+
+export type CoachProductStatus = CoachStatus;
+export type TodayProjection = TodayDto;
+export type TrainingProjection = TrainingDto;
+export type CoachProjection = CoachDto;
+export type ProgressProjection = ProgressDto;
+export type HistoryProjection = HistoryPageDto;
+export type WorkspaceInformationProjection = SettingsDto;
 
 export interface HistoryOptions {
   limit?: number;

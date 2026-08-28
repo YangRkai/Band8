@@ -7,11 +7,15 @@ export default async function setup(): Promise<() => Promise<void>> {
   const repositoryRoot = resolve(process.cwd());
   const temporaryRoot = resolve(repositoryRoot, ".tmp");
   const workspacePath = resolve(temporaryRoot, "phase1d-browser-dogfood");
+  const restartSnapshotPath = resolve(temporaryRoot, "phase1d-browser-before-restart.json");
   if (!workspacePath.startsWith(`${temporaryRoot}\\`) && !workspacePath.startsWith(`${temporaryRoot}/`)) {
     throw new Error("refusing to prepare E2E workspace outside repository .tmp");
   }
   mkdirSync(temporaryRoot, { recursive: true });
-  if (process.env.BAND8_E2E_PRESERVE !== "1") rmSync(workspacePath, { recursive: true, force: true });
+  if (process.env.BAND8_E2E_PRESERVE !== "1") {
+    rmSync(workspacePath, { recursive: true, force: true });
+    rmSync(restartSnapshotPath, { force: true });
+  }
   const artifactIds = ["artifact-writing-golden-draft", "artifact-writing-golden-revision", "artifact-writing-golden-transfer"];
   let event = 0;
   let second = 0;

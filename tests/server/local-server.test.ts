@@ -1,10 +1,12 @@
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { request as httpRequest } from "node:http";
 import { join, resolve } from "node:path";
+import { Readable } from "node:stream";
 
 import { afterEach, describe, expect, it } from "vitest";
 
 import { startBand8Server, type RunningBand8Server } from "../../src/server/server.js";
+import { BODY_LIMITS, readJsonBody } from "../../src/server/body.js";
 
 const repositoryRoot = resolve(process.cwd());
 const workspaces: string[] = [];
@@ -43,6 +45,22 @@ async function rawPost(url: string, headers: Record<string, string>, body: strin
     });
     request.once("error", reject);
     request.end(body);
+  });
+}
+
+async function rawPostResponse(url: string, headers: Record<string, string>, chunks: string[]): Promise<{ status: number; body: string }> {
+  return await new Promise((resolveResponse, reject) => {
+    const request = httpRequest(url, { method: "POST", headers }, (response) => {
+      const responseChunks: Buffer[] = [];
+      response.on("data", (chunk) => responseChunks.push(Buffer.from(chunk)));
+      response.once("end", () => resolveResponse({
+        status: response.statusCode ?? 0,
+        body: Buffer.concat(responseChunks).toString("utf8"),
+      }));
+    });
+    request.once("error", reject);
+    for (const chunk of chunks) request.write(chunk);
+    request.end();
   });
 }
 
@@ -140,6 +158,76 @@ describe("Band8 loopback server security", () => {
     expect((await fetch(`${running.url}/api/v1/fetch?url=https://example.com`)).status).toBe(404);
     expect((await fetch(`${running.url}/api/v1/files?path=C:%5CWindows`)).status).toBe(404);
     expect((await fetch(`${running.url}/api/v1/shell`)).status).toBe(404);
+  });
+
+  it("freezes explicit route body limits to the transport and protocol contracts", () => {
+    expect(BODY_LIMITS).toEqual({
+      timezone: 4_096,
+      session: 16_384,
+      textResponse: 65_536,
+      trainingPackage: 1_048_576,
+      coachContinuation: 1_048_576,
+      coachExport: 16_384,
+    });
+  });
+
+  it("rejects declared payloads above every route class limit before buffering the body", async () => {
+    const running = await server();
+    const token = tokenFrom(await (await fetch(running.url)).text());
+    const headersFor = (limit: number) => ({
+      origin: running.url,
+      "content-type": "application/json",
+      "content-length": String(limit + 1),
+      "x-band8-session": token,
+    });
+    const cases = [
+      ["/api/v1/timezone", BODY_LIMITS.timezone],
+      ["/api/v1/sessions/start", BODY_LIMITS.session],
+      ["/api/v1/training/complete", BODY_LIMITS.textResponse],
+      ["/api/v1/packages/import", BODY_LIMITS.trainingPackage],
+      ["/api/v1/coach/import", BODY_LIMITS.coachContinuation],
+      ["/api/v1/coach/export", BODY_LIMITS.coachExport],
+    ] as const;
+
+    for (const [route, limit] of cases) {
+      const response = await rawPostResponse(`${running.url}${route}`, headersFor(limit), ["x".repeat(limit + 1)]);
+      expect(response.status, route).toBe(413);
+      expect(JSON.parse(response.body), route).toMatchObject({ code: "PAYLOAD_TOO_LARGE" });
+    }
+  }, 15_000);
+
+  it("rejects malformed Content-Length before parsing JSON", async () => {
+    const request = Readable.from(["{}"]) as unknown as Parameters<typeof readJsonBody>[0];
+    Object.defineProperty(request, "headers", {
+      value: { "content-type": "application/json", "content-length": "1.5" },
+    });
+
+    await expect(readJsonBody(request, BODY_LIMITS.timezone)).rejects.toMatchObject({
+      status: 400,
+      code: "INVALID_CONTENT_LENGTH",
+    });
+  });
+
+  it("stops and returns a stable 413 when a chunked request crosses its route limit", async () => {
+    const running = await server();
+    const token = tokenFrom(await (await fetch(running.url)).text());
+    const response = await rawPostResponse(`${running.url}/api/v1/timezone`, {
+      origin: running.url,
+      "content-type": "application/json",
+      "x-band8-session": token,
+    }, ["{\"value\":\"", "x".repeat(BODY_LIMITS.timezone), "\"}"]);
+
+    expect(response.status).toBe(413);
+    expect(JSON.parse(response.body)).toMatchObject({ code: "PAYLOAD_TOO_LARGE" });
+  });
+
+  it("rejects malformed or out-of-range History pagination instead of coercing it", async () => {
+    const running = await server();
+    for (const query of ["limit=0", "limit=101", "limit=1.5", "limit=NaN", "cursor=-1", "cursor=1.5"]) {
+      const response = await fetch(`${running.url}/api/v1/history?${query}`);
+      expect(response.status, query).toBe(400);
+      expect(await response.json(), query).toMatchObject({ code: "INVALID_PAGINATION" });
+    }
   });
 
   it("invalidates the startup token after a complete server restart", async () => {

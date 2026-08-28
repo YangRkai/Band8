@@ -119,6 +119,12 @@ describe("Coach checkpoint product API", () => {
     expect(serialized).not.toMatch(/correct_option_ids|scoring_rule|integrity_ref/iu);
 
     writeFileSync(join(workspacePath, "artifacts", storageKey("artifact-writing-golden-transfer"), "content.txt"), "tampered artifact bytes", "utf8");
+    const todayAfterTamper = await fetch(`${running.url}/api/v1/today`);
+    expect(todayAfterTamper.status).toBe(200);
+    expect(JSON.stringify(await todayAfterTamper.json())).not.toContain("tampered artifact bytes");
+    const progressAfterTamper = await fetch(`${running.url}/api/v1/progress`);
+    expect(progressAfterTamper.status).toBe(200);
+    expect(JSON.stringify(await progressAfterTamper.json())).not.toContain("tampered artifact bytes");
     const quarantinedHistory = await (await fetch(`${running.url}/api/v1/history?limit=20`)).json() as Document;
     const quarantined = quarantinedHistory.items.find((item: Document) => item.session_id === attachment.sessionId);
     expect(quarantined).toMatchObject({ state: "QUARANTINED", integrity: { status: "QUARANTINED" }, artifacts: [] });

@@ -1,10 +1,17 @@
 import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { createServer, type ServerResponse } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { extname, join, relative, resolve } from "node:path";
 
 import { Band8Runtime, type RuntimeOptions } from "../runtime/runtime.js";
-import { BODY_LIMITS, readJsonBody } from "./body.js";
+import {
+  PRODUCT_API_GET_ROUTES,
+  PRODUCT_API_MUTATION_ROUTES,
+  type ActivityResponseDto,
+  type ProductApiGetMap,
+  type ProductApiMutationMap,
+} from "../product-api/dto.js";
+import { BODY_LIMITS, readJsonBody, type JsonRequestObject } from "./body.js";
 import { HttpError, safeError } from "./errors.js";
 import { applySecurityHeaders, validateHost, validateMutation } from "./security.js";
 
@@ -31,9 +38,175 @@ function sendJson(response: ServerResponse, status: number, value: unknown): voi
   response.end(bytes);
 }
 
-function requireObject(value: unknown, name: string): Record<string, any> {
+function requireObject(value: unknown, name: string): JsonRequestObject {
   if (value === null || typeof value !== "object" || Array.isArray(value)) throw new HttpError(400, "INVALID_INPUT", `${name} must be a JSON object`);
-  return value as Record<string, any>;
+  return value as JsonRequestObject;
+}
+
+type ProductGetRoute = keyof ProductApiGetMap;
+type ProductMutationRoute = keyof ProductApiMutationMap;
+
+export type ProductGetHandlers = {
+  [Path in ProductGetRoute]: (url: URL) => ProductApiGetMap[Path];
+};
+
+interface ProductMutationHandler<Path extends ProductMutationRoute> {
+  limit: number;
+  parse: (body: JsonRequestObject) => ProductApiMutationMap[Path]["request"];
+  execute: (input: ProductApiMutationMap[Path]["request"]) => ProductApiMutationMap[Path]["response"];
+  headers?: (output: ProductApiMutationMap[Path]["response"]) => Readonly<Record<string, string>>;
+}
+
+export type ProductMutationHandlers = {
+  [Path in ProductMutationRoute]: ProductMutationHandler<Path>;
+};
+
+function optionalString(body: JsonRequestObject, field: string): string | undefined {
+  const value = body[field];
+  if (value !== undefined && typeof value !== "string") throw new HttpError(400, "INVALID_INPUT", `${field} must be a string`);
+  return value as string | undefined;
+}
+
+function paginationInteger(value: string | null, name: "limit" | "cursor"): number | undefined {
+  if (value === null) return undefined;
+  if (!/^(?:0|[1-9][0-9]*)$/u.test(value)) throw new HttpError(400, "INVALID_PAGINATION", `${name} must be a non-negative integer`);
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || (name === "limit" && (parsed < 1 || parsed > 100))) {
+    throw new HttpError(400, "INVALID_PAGINATION", name === "limit" ? "limit must be from 1 to 100" : "cursor is outside the supported range");
+  }
+  return parsed;
+}
+
+export function createProductApiHandlers(runtime: Band8Runtime): {
+  get: ProductGetHandlers;
+  mutation: ProductMutationHandlers;
+} {
+  const get = {
+    "/api/v1/today": () => runtime.today(),
+    "/api/v1/training": () => runtime.training(),
+    "/api/v1/progress": () => runtime.progress(),
+    "/api/v1/history": (url) => {
+      const limit = paginationInteger(url.searchParams.get("limit"), "limit");
+      const cursor = paginationInteger(url.searchParams.get("cursor"), "cursor");
+      return runtime.history({
+        ...(limit === undefined ? {} : { limit }),
+        ...(cursor === undefined ? {} : { cursor }),
+      });
+    },
+    "/api/v1/coach": () => runtime.coachStatus(),
+    "/api/v1/settings": () => runtime.workspaceInformation(),
+  } satisfies ProductGetHandlers;
+
+  const mutation = {
+    "/api/v1/timezone": {
+      limit: BODY_LIMITS.timezone,
+      parse: (body) => {
+        if (body.operation !== "configure" && body.operation !== "change") {
+          throw new HttpError(400, "INVALID_TIMEZONE_OPERATION", "operation must be configure or change");
+        }
+        if (typeof body.timeZone !== "string") throw new HttpError(400, "INVALID_TIMEZONE_INPUT", "timeZone must be a string");
+        return { operation: body.operation, timeZone: body.timeZone };
+      },
+      execute: (input) => input.operation === "configure"
+        ? runtime.configureLearningTimezone(input.timeZone)
+        : runtime.changeLearningTimezone(input.timeZone),
+    },
+    "/api/v1/packages/import": {
+      limit: BODY_LIMITS.trainingPackage,
+      parse: (body) => ({
+        package: requireObject(body.package, "package"),
+        ...(body.protectedEvaluation === undefined || body.protectedEvaluation === null
+          ? {}
+          : { protectedEvaluation: requireObject(body.protectedEvaluation, "protectedEvaluation") }),
+      }),
+      execute: (input) => runtime.importPackage(
+        JSON.stringify(input.package),
+        input.protectedEvaluation === undefined ? undefined : JSON.stringify(input.protectedEvaluation),
+      ),
+    },
+    "/api/v1/sessions/start": {
+      limit: BODY_LIMITS.session,
+      parse: (body) => {
+        const packageId = optionalString(body, "packageId");
+        const sessionId = optionalString(body, "sessionId");
+        return {
+          ...(packageId === undefined ? {} : { packageId }),
+          ...(sessionId === undefined ? {} : { sessionId }),
+        };
+      },
+      execute: (input) => runtime.beginTraining(input.packageId, input.sessionId),
+    },
+    "/api/v1/training/complete": {
+      limit: BODY_LIMITS.textResponse,
+      parse: (body) => {
+        if (typeof body.sessionId !== "string") throw new HttpError(400, "INVALID_INPUT", "sessionId must be a string");
+        if (body.response === undefined) return { sessionId: body.sessionId };
+        const responseObject = requireObject(body.response, "response");
+        const hasOptions = responseObject.optionIds !== undefined;
+        const hasText = responseObject.text !== undefined;
+        if (hasOptions === hasText) throw new HttpError(400, "INVALID_INPUT", "response must contain exactly one of optionIds or text");
+        let activityResponse: ActivityResponseDto;
+        if (hasOptions) {
+          if (!Array.isArray(responseObject.optionIds) || responseObject.optionIds.some((item) => typeof item !== "string")) {
+            throw new HttpError(400, "INVALID_INPUT", "optionIds must be a string array");
+          }
+          activityResponse = { optionIds: [...responseObject.optionIds] as string[] };
+        } else {
+          if (typeof responseObject.text !== "string") throw new HttpError(400, "INVALID_INPUT", "text must be a string");
+          activityResponse = { text: responseObject.text };
+        }
+        return { sessionId: body.sessionId, response: activityResponse };
+      },
+      execute: (input) => runtime.submitCurrentActivity(input.sessionId, input.response),
+    },
+    "/api/v1/coach/export": {
+      limit: BODY_LIMITS.coachExport,
+      parse: (body) => {
+        if (typeof body.sessionId !== "string") throw new HttpError(400, "INVALID_INPUT", "sessionId must be a string");
+        return { sessionId: body.sessionId };
+      },
+      execute: (input) => runtime.exportCheckpointDownload(input.sessionId),
+      headers: (output) => ({ "content-disposition": `attachment; filename="band8-coach-${output.checkpoint_id}.json"` }),
+    },
+    "/api/v1/coach/import": {
+      limit: BODY_LIMITS.coachContinuation,
+      parse: (body) => {
+        if (typeof body.priorSessionId !== "string") throw new HttpError(400, "INVALID_INPUT", "priorSessionId must be a string");
+        return { priorSessionId: body.priorSessionId, package: requireObject(body.package, "package") };
+      },
+      execute: (input) => ({
+        ...runtime.attachContinuation(input.priorSessionId, JSON.stringify(input.package)),
+        coach: runtime.coachStatus(),
+      }),
+    },
+  } satisfies ProductMutationHandlers;
+  return { get, mutation };
+}
+
+function isRoute<Route extends string>(routes: readonly Route[], value: string): value is Route {
+  return routes.some((route) => route === value);
+}
+
+function sendProductGet<Path extends ProductGetRoute>(
+  response: ServerResponse,
+  handler: ProductGetHandlers[Path],
+  url: URL,
+): void {
+  const output: ProductApiGetMap[Path] = handler(url);
+  sendJson(response, 200, output);
+}
+
+async function sendProductMutation<Path extends ProductMutationRoute>(
+  request: IncomingMessage,
+  response: ServerResponse,
+  handlers: ProductMutationHandlers,
+  path: Path,
+): Promise<void> {
+  const handler: ProductMutationHandler<Path> = handlers[path];
+  const input = handler.parse(await readJsonBody(request, handler.limit));
+  const output = handler.execute(input);
+  for (const [name, value] of Object.entries(handler.headers?.(output) ?? {})) response.setHeader(name, value);
+  sendJson(response, 200, output);
 }
 
 function entryHtml(staticRoot: string, token: string): string {
@@ -76,6 +249,7 @@ export async function startBand8Server(options: StartBand8ServerOptions): Promis
     workspacePath: resolve(options.workspacePath),
   });
   const staticRoot = resolve(options.staticRoot ?? join(options.repositoryRoot, "dist", "web"));
+  const productApi = createProductApiHandlers(runtime);
   let expectedHost = "";
   let origin = "";
   const httpServer = createServer(async (request, response) => {
@@ -84,87 +258,12 @@ export async function startBand8Server(options: StartBand8ServerOptions): Promis
       validateHost(request, expectedHost);
       const requestUrl = new URL(request.url ?? "/", origin);
       if (request.method === "POST") validateMutation(request, origin, token);
-      if (request.method === "GET" && requestUrl.pathname === "/api/v1/today") {
-        sendJson(response, 200, runtime.today());
+      if (request.method === "GET" && isRoute(PRODUCT_API_GET_ROUTES, requestUrl.pathname)) {
+        sendProductGet(response, productApi.get[requestUrl.pathname], requestUrl);
         return;
       }
-      if (request.method === "GET" && requestUrl.pathname === "/api/v1/training") {
-        sendJson(response, 200, runtime.training());
-        return;
-      }
-      if (request.method === "GET" && requestUrl.pathname === "/api/v1/progress") {
-        sendJson(response, 200, runtime.progress());
-        return;
-      }
-      if (request.method === "GET" && requestUrl.pathname === "/api/v1/coach") {
-        sendJson(response, 200, runtime.coachStatus());
-        return;
-      }
-      if (request.method === "GET" && requestUrl.pathname === "/api/v1/settings") {
-        sendJson(response, 200, runtime.workspaceInformation());
-        return;
-      }
-      if (request.method === "GET" && requestUrl.pathname === "/api/v1/history") {
-        const limit = requestUrl.searchParams.get("limit");
-        const cursor = requestUrl.searchParams.get("cursor");
-        sendJson(response, 200, runtime.history({
-          ...(limit === null ? {} : { limit: Number(limit) }),
-          ...(cursor === null ? {} : { cursor: Number(cursor) }),
-        }));
-        return;
-      }
-      if (request.method === "POST" && requestUrl.pathname === "/api/v1/timezone") {
-        const body = await readJsonBody(request, BODY_LIMITS.timezone);
-        if (typeof body.timeZone !== "string") throw new HttpError(400, "INVALID_TIMEZONE_INPUT", "timeZone must be a string");
-        const epoch = body.operation === "configure"
-          ? runtime.configureLearningTimezone(body.timeZone)
-          : body.operation === "change"
-            ? runtime.changeLearningTimezone(body.timeZone)
-            : (() => { throw new HttpError(400, "INVALID_TIMEZONE_OPERATION", "operation must be configure or change"); })();
-        sendJson(response, 200, epoch);
-        return;
-      }
-      if (request.method === "POST" && requestUrl.pathname === "/api/v1/packages/import") {
-        const body = await readJsonBody(request, BODY_LIMITS.trainingPackage);
-        const packageDocument = requireObject(body.package, "package");
-        const protectedDocument = body.protectedEvaluation === undefined || body.protectedEvaluation === null
-          ? undefined
-          : requireObject(body.protectedEvaluation, "protectedEvaluation");
-        const imported = runtime.importPackage(
-          JSON.stringify(packageDocument),
-          protectedDocument === undefined ? undefined : JSON.stringify(protectedDocument),
-        );
-        sendJson(response, 200, imported);
-        return;
-      }
-      if (request.method === "POST" && requestUrl.pathname === "/api/v1/sessions/start") {
-        const body = await readJsonBody(request, BODY_LIMITS.session);
-        if (body.packageId !== undefined && typeof body.packageId !== "string") throw new HttpError(400, "INVALID_INPUT", "packageId must be a string");
-        if (body.sessionId !== undefined && typeof body.sessionId !== "string") throw new HttpError(400, "INVALID_INPUT", "sessionId must be a string");
-        sendJson(response, 200, runtime.beginTraining(body.packageId as string | undefined, body.sessionId as string | undefined));
-        return;
-      }
-      if (request.method === "POST" && requestUrl.pathname === "/api/v1/training/complete") {
-        const body = await readJsonBody(request, BODY_LIMITS.textResponse);
-        if (typeof body.sessionId !== "string") throw new HttpError(400, "INVALID_INPUT", "sessionId must be a string");
-        const activityResponse = body.response === undefined ? undefined : requireObject(body.response, "response");
-        sendJson(response, 200, runtime.submitCurrentActivity(body.sessionId, activityResponse));
-        return;
-      }
-      if (request.method === "POST" && requestUrl.pathname === "/api/v1/coach/export") {
-        const body = await readJsonBody(request, BODY_LIMITS.coachExport);
-        if (typeof body.sessionId !== "string") throw new HttpError(400, "INVALID_INPUT", "sessionId must be a string");
-        const exported = runtime.exportCheckpointDownload(body.sessionId);
-        response.setHeader("content-disposition", `attachment; filename="band8-coach-${exported.checkpoint_id}.json"`);
-        sendJson(response, 200, exported);
-        return;
-      }
-      if (request.method === "POST" && requestUrl.pathname === "/api/v1/coach/import") {
-        const body = await readJsonBody(request, BODY_LIMITS.coachContinuation);
-        if (typeof body.priorSessionId !== "string") throw new HttpError(400, "INVALID_INPUT", "priorSessionId must be a string");
-        const packageDocument = requireObject(body.package, "package");
-        const attached = runtime.attachContinuation(body.priorSessionId, JSON.stringify(packageDocument));
-        sendJson(response, 200, { ...attached, coach: runtime.coachStatus() });
+      if (request.method === "POST" && isRoute(PRODUCT_API_MUTATION_ROUTES, requestUrl.pathname)) {
+        await sendProductMutation(request, response, productApi.mutation, requestUrl.pathname);
         return;
       }
       if (requestUrl.pathname.startsWith("/api/")) throw new HttpError(404, "API_NOT_FOUND", "API route not found");
