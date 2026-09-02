@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -71,6 +71,30 @@ describe("workspace and package identity", () => {
 
     expect(() => importer.importFromText(JSON.stringify(changed))).toThrow(/collision/u);
     expect(importer.list()).toHaveLength(1);
+  });
+
+  it("rejects an accepted package whose stored bytes no longer match its registered identity", () => {
+    const workspace = initializeWorkspace(temporaryWorkspace());
+    const importer = new PackageImporter(workspace, createProtocolValidator(repositoryRoot));
+    importer.importFromText(packageText, protectedText);
+    const record = importer.record("pkg-runtime-reading-001");
+    const changed = JSON.parse(packageText) as Record<string, any>;
+    changed.session_intent.objective = "Tampered after import";
+    writeFileSync(record.package_file, `${JSON.stringify(changed)}\n`, "utf8");
+
+    expect(() => importer.loadPackage("pkg-runtime-reading-001")).toThrow(/integrity|hash/iu);
+  });
+
+  it("rejects an accepted protected evaluation whose stored bytes no longer match the package reference", () => {
+    const workspace = initializeWorkspace(temporaryWorkspace());
+    const importer = new PackageImporter(workspace, createProtocolValidator(repositoryRoot));
+    importer.importFromText(packageText, protectedText);
+    const record = importer.record("pkg-runtime-reading-001");
+    const changed = JSON.parse(protectedText) as Record<string, any>;
+    changed.entries[0].correct_option_ids = ["false"];
+    writeFileSync(record.protected_file!, `${JSON.stringify(changed)}\n`, "utf8");
+
+    expect(() => importer.loadProtected("pkg-runtime-reading-001")).toThrow(/integrity|hash/iu);
   });
 });
 

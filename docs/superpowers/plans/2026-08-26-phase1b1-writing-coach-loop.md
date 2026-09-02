@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Work only in `E:\Band8` on `feature/phase1b1-writing-coach-loop` from `d5cb4d8bf9062d52942637ba26c5448a9ba06ef7`.
+- Work only in the Band8 repository on `feature/phase1b1-writing-coach-loop` from `d5cb4d8bf9062d52942637ba26c5448a9ba06ef7`.
 - Do not modify B8TP schemas, JCS identity, raw evidence, or Phase 1A semantics.
 - Runtime performs no AI diagnosis, subjective scoring, Coach generation, network access, deployment, or push.
 - Support only UTF-8 text artifacts and `TEXT_RESPONSE`; Speaking/audio remains outside scope.

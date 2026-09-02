@@ -4,7 +4,7 @@ export default defineConfig({
   root: "web",
   build: {
     outDir: "../dist/web",
-    emptyOutDir: false,
+    emptyOutDir: true,
     sourcemap: true,
   },
   server: {

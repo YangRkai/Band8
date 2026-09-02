@@ -2,7 +2,7 @@
 
 ## Status
 
-Phase 0.6 freezes protocol and responsibility boundaries only. No UI, backend, database, model integration, production Runtime, deployment, or Phase 1 implementation exists.
+`v0.1.0-alpha.1` implements the local Runtime, evidence and artifact stores, Coach checkpoint exchange, reinforcement projections, and loopback Web Shell on top of the frozen B8TP 0.1 responsibility boundaries. It does not add an automatic Coach, cloud service, production deployment, or calibrated IELTS scoring.
 
 ## Responsibility split
 
@@ -38,16 +38,17 @@ One learner session may contain one run; one run may contain several immutable s
 ## Local-first workspace
 
 - `protocol/` is version-controlled authority.
-- `inbox/` receives untrusted packages and protected evaluation documents.
-- `sessions/<session-id>/runs/<run-id>/segments/<segment-id>/` owns accepted package, events, checkpoint/result, and artifacts.
-- `state/` contains learner state, hypotheses, review constraints, and reinforcement decisions.
-- `export/` copies learner-owned protocol data without rewriting identifiers.
+- `packages/` and `protected/` store imported package and evaluation documents under Runtime-derived keys.
+- `sessions/` stores session metadata, append-only events, checkpoints, and results under Runtime-derived keys.
+- `artifacts/` stores learner artifact bytes and metadata under Runtime-derived keys.
+- `coach/` stores explicit checkpoint exports and continuation bindings.
+- `settings/` and `reinforcement/` store learning-timezone epochs and derived reinforcement state.
 - Runtime storage roots own all paths; protocol paths are normalized relative paths.
 
 ## Runtime invariants
 
 1. Import is deterministic and default-deny.
-2. Only the ten V0.1 executable primitives run.
+2. The alpha Runtime executes `INSTRUCTION`, `PRESENT_TEXT`, `SELECT`, and `TEXT_RESPONSE`; any other schema-valid V0.1 primitive is rejected explicitly as unsupported.
 3. Ordinary text is DATA ONLY; no package field conveys code, host path, network, UI, tool, or reward authority.
 4. Raw evidence is append-only and outranks all derived summaries.
 5. Protected evaluation never projects into learner-visible content before its boundary.
@@ -58,4 +59,4 @@ One learner session may contain one run; one run may contain several immutable s
 
 ## Phase boundary
 
-Phase 0.6 produces contracts, schemas, examples, fixtures, and a deterministic reference validator. It does not implement persistence, UI isolation, model execution, or production recovery.
+B8TP 0.1 remains the protocol boundary. This alpha adds local product execution without changing that core protocol and still excludes model execution, cloud operation, and production deployment.

@@ -28,6 +28,19 @@ afterEach(() => {
 });
 
 describe("headless CLI harness", () => {
+  it("reports release metadata without requiring a workspace", async () => {
+    const output: string[] = [];
+    const dependencies = { repositoryRoot, write: (value: string) => output.push(value) };
+
+    expect(await executeCli(["--version"], dependencies)).toBe(0);
+    expect(output).toEqual(["0.1.0-alpha.1"]);
+
+    output.length = 0;
+    expect(await executeCli(["--help"], dependencies)).toBe(0);
+    expect(output.join("\n")).toContain("band8 --workspace <path> serve");
+    expect(output.join("\n")).toContain("127.0.0.1");
+  });
+
   it("registers both shutdown signals, closes once, and removes its listeners", async () => {
     const signals = new EventEmitter();
     let closes = 0;

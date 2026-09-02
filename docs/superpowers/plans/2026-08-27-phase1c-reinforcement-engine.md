@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Work only in `E:\Band8` on `feature/phase1c-reinforcement-engine`.
+- Work only in the Band8 repository on `feature/phase1c-reinforcement-engine`.
 - Do not change any frozen protocol document or schema.
 - `PATTERN_BROKEN` is the only event persisted as a B8TP reinforcement decision in protocol version `0.1.0`.
 - Coach packages and hypotheses may identify targets, but cannot grant events, thresholds, qualifications, streaks, or mastery.

@@ -12,7 +12,7 @@ Build and serve:
 
 ```powershell
 npm run build
-node dist/src/cli/index.js --workspace E:\path\to\workspace serve --no-open
+node dist/src/cli/index.js --workspace <workspace> serve --no-open
 ```
 
 The server:

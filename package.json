@@ -1,11 +1,20 @@
 {
   "name": "band8",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.1",
+  "description": "Protocol-first, local-first IELTS personalized training runtime with an external Coach boundary.",
+  "license": "Apache-2.0",
   "private": true,
   "type": "module",
   "bin": {
     "band8": "dist/src/cli/index.js"
   },
+  "files": [
+    "dist/src",
+    "dist/web",
+    "protocol",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "vite --config web/vite.config.ts",
     "build": "tsc -p tsconfig.json && vite build --config web/vite.config.ts",
@@ -22,13 +31,17 @@
     "test:idempotency": "vitest run tests/runtime/storage-runtime.test.ts tests/runtime/runtime-golden.test.ts -t \"persists import identity|different canonical content|duplicate resume|rebuilds\"",
     "test:server": "vitest run tests/server",
     "test:web": "vitest run tests/web",
-    "test:e2e": "npm run build && node tests/e2e/run.mjs"
+    "test:e2e": "npm run build && node tests/e2e/run.mjs",
+    "verify:protocol": "python tests/protocol/validate_protocol.py all . && python -m unittest discover -s tests/protocol -p \"test_*.py\" -v",
+    "check:release": "vitest run tests/release/release-hardening.test.ts",
+    "verify:release": "npm run verify:protocol && npm test && npm run typecheck && npm run build && npm run test:parity"
   },
   "engines": {
-    "node": ">=20"
+    "node": "20.x"
   },
+  "packageManager": "npm@10.8.2",
   "dependencies": {
-    "ajv": "8.17.1",
+    "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
     "canonicalize": "2.1.0",
     "jsonc-parser": "3.3.1",
@@ -41,7 +54,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
     "typescript": "5.7.2",
-    "vite": "^5.4.21",
-    "vitest": "2.1.8"
+    "vite": "6.4.3",
+    "vitest": "3.2.6"
   }
 }

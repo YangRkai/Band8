@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Work only in `E:\Band8` on `feature/phase1d-local-web-shell` with base `8dad87b34eb0e60d5944f0a1b3d6288e4adc0591` in history.
+- Work only in the Band8 repository on `feature/phase1d-local-web-shell` with base `8dad87b34eb0e60d5944f0a1b3d6288e4adc0591` in history.
 - Do not change B8TP schemas or raw evidence.
 - Runtime is the only authority for state, evaluation, artifacts, continuation, mission, streak, reveal, and qualification.
 - Bind only `127.0.0.1`; never add wildcard CORS, arbitrary path, URL fetch, shell, dynamic code, telemetry, or remote assets.

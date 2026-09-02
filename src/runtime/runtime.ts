@@ -312,9 +312,9 @@ export class Band8Runtime {
 
   inspectSession(sessionId: string): { status: InspectionStatus; reason?: string } {
     const session = this.#sessions.read(sessionId);
-    const packageDocument = this.#importer.loadPackage(session.package_id);
-    let events: Document[];
     try {
+      const packageDocument = this.#importer.loadPackage(session.package_id);
+      let events: Document[];
       events = this.#events.read(sessionId);
       const reconciliation = this.#artifacts.reconcile(sessionId, events);
       if (reconciliation.status === "INVALID") {

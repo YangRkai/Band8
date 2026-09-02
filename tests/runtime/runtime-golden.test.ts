@@ -136,6 +136,19 @@ describe("Reading Golden Run", () => {
     expect(runtime.getSession("session-runtime-tampered-result").quarantine_reason).toMatch(/result/iu);
   });
 
+  it("quarantines a session when its accepted package no longer matches the registered identity", () => {
+    const path = workspace();
+    const runtime = open(path);
+    importAndStart(runtime, "session-runtime-tampered-package");
+    const storedPackagePath = join(path, "packages", `${storageKey("pkg-runtime-reading-001")}.json`);
+    const changed = JSON.parse(packageText) as Record<string, any>;
+    changed.session_intent.objective = "Tampered after import";
+    writeFileSync(storedPackagePath, `${JSON.stringify(changed)}\n`, "utf8");
+
+    expect(runtime.inspectSession("session-runtime-tampered-package").status).toBe("QUARANTINED");
+    expect(runtime.getSession("session-runtime-tampered-package").quarantine_reason).toMatch(/package|integrity|hash/iu);
+  });
+
   it("fails explicitly when a schema-valid package reaches an unimplemented primitive", () => {
     const path = workspace();
     const runtime = open(path);

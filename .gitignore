@@ -25,12 +25,14 @@ Desktop.ini
 # Build, dependency, and cache directories
 build/
 dist/
+.venv/
 coverage/
 playwright-report/
 test-results/
 node_modules/
 .cache/
 .tmp/
+.release/
 tmp/
 temp/
 __pycache__/

@@ -41,7 +41,10 @@ export class PackageImporter {
     const verdict = this.validator.validatePackage(packageDocument, seen);
     const packageId = packageDocument.package_id as string;
     const hash = canonicalHash(packageDocument);
-    if (verdict.identity === "idempotent") return { status: "IDEMPOTENT", packageId, canonicalHash: hash };
+    if (verdict.identity === "idempotent") {
+      this.loadProtected(packageId);
+      return { status: "IDEMPOTENT", packageId, canonicalHash: hash };
+    }
 
     const reference = packageDocument.protected_evaluation_ref as Document | null;
     let protectedDocument: Document | undefined;
@@ -78,12 +81,37 @@ export class PackageImporter {
 
   loadPackage(packageId: string): Document {
     const record = this.#record(packageId);
-    return parseJsonStrict(readFileSync(record.package_file, "utf8")) as Document;
+    const expectedPath = join(this.workspace.paths.packages, `${storageKey(packageId)}.json`);
+    if (record.package_id !== packageId || record.package_file !== expectedPath) {
+      throw new Error("package registry integrity failure");
+    }
+    const document = parseJsonStrict(readFileSync(record.package_file, "utf8")) as Document;
+    if (
+      document.package_id !== packageId
+      || document.protocol_version !== record.protocol_version
+      || canonicalHash(document) !== record.canonical_hash
+    ) {
+      throw new Error("package integrity hash mismatch");
+    }
+    this.validator.validatePackage(document, new Map([[packageId, record.canonical_hash]]));
+    return document;
   }
 
   loadProtected(packageId: string): Document | undefined {
     const record = this.#record(packageId);
-    return record.protected_file === null ? undefined : parseJsonStrict(readFileSync(record.protected_file, "utf8")) as Document;
+    const packageDocument = this.loadPackage(packageId);
+    const reference = packageDocument.protected_evaluation_ref as Document | null;
+    if (reference === null) {
+      if (record.protected_file !== null) throw new Error("protected evaluation registry integrity failure");
+      return undefined;
+    }
+    const expectedPath = join(this.workspace.paths.protected, `${storageKey(reference.evaluation_id)}.json`);
+    if (record.protected_file === null || record.protected_file !== expectedPath) {
+      throw new Error("protected evaluation registry integrity failure");
+    }
+    const document = parseJsonStrict(readFileSync(record.protected_file, "utf8")) as Document;
+    this.validator.validateProtectedEvaluation(document, packageDocument);
+    return document;
   }
 
   record(packageId: string): ImportRecord {

@@ -49,6 +49,31 @@ describe("Band8 package validation", () => {
       validator.validatePackage(json("tests/protocol/fixtures/adversarial/assessment-answer-leakage.json")),
     ).toThrow(ProtocolValidationError);
   });
+
+  it("rejects invalid TEXT_RESPONSE kinds, types, bounds, and artifact types during import", () => {
+    const valid = json("tests/protocol/fixtures/valid/writing-training-package.json") as Record<string, any>;
+    const activityIndex = valid.activities.findIndex((activity: Record<string, any>) => activity.type === "TEXT_RESPONSE");
+    expect(activityIndex).toBeGreaterThanOrEqual(0);
+    const invalidPackages: Record<string, any>[] = [];
+    const mutate = (change: (activity: Record<string, any>) => void) => {
+      const candidate = structuredClone(valid);
+      change(candidate.activities[activityIndex]);
+      invalidPackages.push(candidate);
+    };
+    mutate((activity) => { activity.config.response_kind = "essay"; });
+    mutate((activity) => { activity.config.min_characters = "1"; });
+    mutate((activity) => { activity.config.min_characters = -1; });
+    mutate((activity) => { activity.config.min_characters = activity.config.max_characters + 1; });
+    mutate((activity) => { activity.config.max_characters = 12_001; });
+    mutate((activity) => {
+      activity.config.artifact_type = "transcript";
+      activity.output_contract.artifact_type = "transcript";
+    });
+
+    for (const candidate of invalidPackages) {
+      expect(() => validator.validatePackage(candidate)).toThrow(ProtocolValidationError);
+    }
+  });
 });
 
 describe("Band8 event validation", () => {

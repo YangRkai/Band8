@@ -84,6 +84,18 @@ function validatePrimitive(activity: Document): void {
     if (!(Number.isInteger(minimum) && Number.isInteger(maximum) && minimum >= 1 && minimum <= maximum && maximum <= options.length)) fail("SELECT cardinality is invalid");
     if (config.selection_mode === "one" && (minimum !== 1 || maximum !== 1)) fail("single SELECT requires cardinality one");
     if (!new Set(["one", "multiple"]).has(config.selection_mode)) fail("SELECT selection_mode is invalid");
+  } else if (primitive === "TEXT_RESPONSE") {
+    if (!new Set(["short", "long", "explanation", "recall"]).has(config.response_kind)) {
+      fail("TEXT_RESPONSE response_kind is invalid");
+    }
+    const minimum = config.min_characters as number;
+    const maximum = config.max_characters as number;
+    if (!(Number.isSafeInteger(minimum) && Number.isSafeInteger(maximum) && minimum >= 1 && minimum <= maximum && maximum <= 12_000)) {
+      fail("TEXT_RESPONSE character bounds are invalid");
+    }
+    if (config.artifact_type !== undefined && !new Set(["essay", "rewrite", "long_form_answer"]).has(config.artifact_type)) {
+      fail("TEXT_RESPONSE artifact_type is invalid");
+    }
   }
 }
 

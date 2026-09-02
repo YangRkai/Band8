@@ -3,7 +3,7 @@
 Install the protocol-oracle dependency with:
 
 ```text
-python -m pip install -r tests/protocol/requirements.txt
+python -m pip install -r requirements-protocol.txt
 ```
 
 `rfc8785` is scoped to the Python reference/oracle and produces the RFC 8785 JCS UTF-8 bytes used by canonical package identity. Runtime dependencies remain separate.

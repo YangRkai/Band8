@@ -2,8 +2,8 @@
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createInterface } from "node:readline/promises";
 
 import { canonicalJson, parseJsonStrict } from "../protocol/canonical.js";
@@ -37,6 +37,34 @@ interface ParsedArguments {
   sessionId?: string;
   port?: number;
   noOpen: boolean;
+}
+
+const HELP_TEXT = `Band8 local-first training runtime
+
+Usage:
+  band8 --version
+  band8 --help
+  band8 --workspace <path> serve [--port <port>] [--no-open]
+  band8 --workspace <path> <validate|import|run|checkpoint|continue|reinforce|reveal|mission|timezone> [target...]
+
+The local web server binds only to 127.0.0.1. Use --no-open to suppress browser opening.`;
+
+function readReleaseVersion(repositoryRoot?: string): string {
+  const cliDirectory = dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    ...(repositoryRoot === undefined ? [] : [resolve(repositoryRoot, "package.json")]),
+    resolve(cliDirectory, "../../package.json"),
+    resolve(cliDirectory, "../../../package.json"),
+  ];
+  for (const candidate of candidates) {
+    try {
+      const metadata = JSON.parse(readFileSync(candidate, "utf8")) as { name?: string; version?: string };
+      if (metadata.name === "band8" && typeof metadata.version === "string") return metadata.version;
+    } catch {
+      // Keep searching parent layouts used by source tests and compiled CLI execution.
+    }
+  }
+  throw new Error("Band8 release metadata could not be located");
 }
 
 function takeOption(argumentsList: string[], name: string): string | undefined {
@@ -134,9 +162,17 @@ async function terminalRead(prompt: string): Promise<string> {
 }
 
 export async function executeCli(argumentsList: string[], dependencies: CliDependencies = {}): Promise<number> {
-  const parsed = parseArguments(argumentsList);
   const repositoryRoot = dependencies.repositoryRoot ?? resolve(process.cwd());
   const write = dependencies.write ?? ((value: string) => process.stdout.write(`${value}\n`));
+  if (argumentsList.length === 1 && argumentsList[0] === "--version") {
+    write(readReleaseVersion(dependencies.repositoryRoot));
+    return 0;
+  }
+  if (argumentsList.length === 1 && ["--help", "-h"].includes(argumentsList[0]!)) {
+    write(HELP_TEXT);
+    return 0;
+  }
+  const parsed = parseArguments(argumentsList);
   const read = dependencies.read ?? terminalRead;
   if (parsed.command === "validate") {
     const packageDocument = parseJsonStrict(readFileSync(resolve(parsed.targets[0]!), "utf8"));
