@@ -1,10 +1,12 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
 import { startBand8Server, type RunningBand8Server } from "../../src/server/server.js";
+import { Band8Runtime } from "../../src/runtime/runtime.js";
 import { storageKey } from "../../src/storage/workspace.js";
+import { snapshotWorkspace } from "../helpers/workspace-snapshot.js";
 
 type Document = Record<string, any>;
 
@@ -12,6 +14,7 @@ const repositoryRoot = resolve(process.cwd());
 const readingPackage = JSON.parse(readFileSync(resolve(repositoryRoot, "tests/runtime/fixtures/reading-golden/training-package.json"), "utf8")) as Document;
 const readingProtected = JSON.parse(readFileSync(resolve(repositoryRoot, "tests/runtime/fixtures/reading-golden/protected-evaluation.json"), "utf8")) as Document;
 const writingPackage = JSON.parse(readFileSync(resolve(repositoryRoot, "tests/runtime/fixtures/writing-golden/package-a.json"), "utf8")) as Document;
+const writingDraft = readFileSync(resolve(repositoryRoot, "tests/runtime/fixtures/writing-golden/draft.txt"), "utf8").trim();
 const workspaces: string[] = [];
 const servers: RunningBand8Server[] = [];
 
@@ -25,12 +28,36 @@ function workspace(): string {
 
 async function open(): Promise<{ running: RunningBand8Server; token: string; workspacePath: string }> {
   const workspacePath = workspace();
+  return await openWorkspace(workspacePath);
+}
+
+async function openWorkspace(workspacePath: string): Promise<{ running: RunningBand8Server; token: string; workspacePath: string }> {
   const running = await startBand8Server({ repositoryRoot, workspacePath, port: 0 });
   servers.push(running);
   const html = await (await fetch(running.url)).text();
   const token = html.match(/<meta name="band8-session" content="([^"]+)">/u)?.[1];
   if (token === undefined) throw new Error("missing local session token");
   return { running, token, workspacePath };
+}
+
+function prepareReading(workspacePath: string, sessionId: string): void {
+  let event = 0;
+  let second = 0;
+  const runtime = Band8Runtime.open({
+    repositoryRoot,
+    workspacePath,
+    eventIdFactory: () => `event-readonly-${++event}`,
+    now: () => new Date(Date.UTC(2026, 7, 27, 12, 0, second++)).toISOString(),
+    timezoneEpochIdFactory: () => "timezone-epoch-readonly",
+  });
+  runtime.configureLearningTimezone("Asia/Shanghai");
+  runtime.importPackage(JSON.stringify(readingPackage), JSON.stringify(readingProtected));
+  runtime.createSession(readingPackage.package_id, sessionId);
+  runtime.startSession(sessionId);
+  runtime.completeCurrentActivity(sessionId);
+  runtime.completeCurrentActivity(sessionId);
+  runtime.completeCurrentActivity(sessionId, { optionIds: ["true"] });
+  runtime.completeCurrentActivity(sessionId, { optionIds: ["not-given"] });
 }
 
 async function post(running: RunningBand8Server, token: string, path: string, body: Document): Promise<Response> {
@@ -51,6 +78,112 @@ afterEach(async () => {
 });
 
 describe("learner-safe product API", () => {
+  it.each(["today", "training", "progress"])("GET /%s does not persist a missing active selection", async (route) => {
+    const workspacePath = workspace();
+    const runtime = Band8Runtime.open({ repositoryRoot, workspacePath });
+    runtime.importPackage(JSON.stringify(readingPackage), JSON.stringify(readingProtected));
+    runtime.createSession(readingPackage.package_id, `session-readonly-${route}`);
+    unlinkSync(join(workspacePath, "settings", "product-selection.json"));
+    const before = snapshotWorkspace(workspacePath);
+    const { running } = await openWorkspace(workspacePath);
+
+    expect(snapshotWorkspace(workspacePath)).toEqual(before);
+
+    const response = await fetch(`${running.url}/api/v1/${route}`);
+
+    expect(response.status).toBe(200);
+    expect(snapshotWorkspace(workspacePath)).toEqual(before);
+  });
+
+  it("GET /history projects quarantine without persisting session metadata", async () => {
+    const workspacePath = workspace();
+    const sessionId = "session-readonly-history";
+    prepareReading(workspacePath, sessionId);
+    writeFileSync(join(workspacePath, "sessions", storageKey(sessionId), "result.json"), "{}\n", "utf8");
+    const { running } = await openWorkspace(workspacePath);
+    const before = snapshotWorkspace(workspacePath);
+
+    const response = await fetch(`${running.url}/api/v1/history?limit=20`);
+    const payload = await response.json() as Document;
+
+    expect(response.status).toBe(200);
+    expect(payload.items[0]).toMatchObject({ session_id: sessionId, state: "QUARANTINED", integrity: { status: "QUARANTINED" } });
+    expect(snapshotWorkspace(workspacePath)).toEqual(before);
+  });
+
+  it("all Product API GET routes remain byte-stable across ten projection rounds", async () => {
+    const workspacePath = workspace();
+    prepareReading(workspacePath, "session-readonly-repeated");
+    const { running } = await openWorkspace(workspacePath);
+    const routes = ["today", "training", "progress", "history?limit=20", "coach", "settings"];
+    const before = snapshotWorkspace(workspacePath);
+    let baseline: string[] | undefined;
+
+    for (let round = 0; round < 10; round += 1) {
+      const payloads: string[] = [];
+      for (const route of routes) {
+        const beforeRoute = snapshotWorkspace(workspacePath);
+        const response = await fetch(`${running.url}/api/v1/${route}`);
+        expect(response.status).toBe(200);
+        payloads.push(JSON.stringify(await response.json()));
+        expect(snapshotWorkspace(workspacePath)).toEqual(beforeRoute);
+      }
+      baseline ??= payloads;
+      expect(payloads).toEqual(baseline);
+    }
+
+    expect(snapshotWorkspace(workspacePath)).toEqual(before);
+  });
+
+  it("recovers only a persisted checkpoint crash window before accepting GET traffic", async () => {
+    const workspacePath = workspace();
+    const sessionId = "session-readonly-checkpoint-recovery";
+    let event = 0;
+    let second = 0;
+    const runtime = Band8Runtime.open({
+      repositoryRoot,
+      workspacePath,
+      eventIdFactory: () => `event-checkpoint-recovery-${++event}`,
+      artifactIdFactory: () => "artifact-checkpoint-recovery",
+      now: () => new Date(Date.UTC(2026, 7, 27, 12, 0, second++)).toISOString(),
+    });
+    runtime.importPackage(JSON.stringify(writingPackage));
+    runtime.createSession(writingPackage.package_id, sessionId);
+    runtime.startSession(sessionId);
+    runtime.completeCurrentActivity(sessionId);
+    runtime.completeCurrentActivity(sessionId);
+    const sessionPath = join(workspacePath, "sessions", storageKey(sessionId), "session.json");
+    const metadataBeforeTerminalCheckpoint = readFileSync(sessionPath, "utf8");
+    runtime.completeCurrentActivity(sessionId, { text: writingDraft });
+    writeFileSync(sessionPath, metadataBeforeTerminalCheckpoint, "utf8");
+
+    const { running } = await openWorkspace(workspacePath);
+    const recovered = JSON.parse(readFileSync(sessionPath, "utf8")) as Document;
+    const beforeGet = snapshotWorkspace(workspacePath);
+    const response = await fetch(`${running.url}/api/v1/training`);
+
+    expect(recovered).toMatchObject({ state: "AWAITING_COACH", checkpoint_id: "checkpoint-writing-golden" });
+    expect(response.status).toBe(200);
+    expect(snapshotWorkspace(workspacePath)).toEqual(beforeGet);
+  });
+
+  it("does not materialize reinforcement for an unmarked completed session during startup or GET", async () => {
+    const workspacePath = workspace();
+    const sessionId = "session-readonly-reinforcement-recovery";
+    prepareReading(workspacePath, sessionId);
+    const beforeStart = snapshotWorkspace(workspacePath);
+
+    expect(beforeStart.some((entry) => entry.path.startsWith("reinforcement/learning-days/"))).toBe(false);
+
+    const { running } = await openWorkspace(workspacePath);
+    expect(snapshotWorkspace(workspacePath)).toEqual(beforeStart);
+    const beforeGet = snapshotWorkspace(workspacePath);
+    const response = await fetch(`${running.url}/api/v1/today`);
+
+    expect(response.status).toBe(200);
+    expect(snapshotWorkspace(workspacePath)).toEqual(beforeGet);
+  });
+
   it("never serializes the absolute Runtime workspace root into learner-visible DTOs", async () => {
     const { running, workspacePath } = await open();
     const routes = ["today", "training", "progress", "history?limit=20", "coach", "settings"];

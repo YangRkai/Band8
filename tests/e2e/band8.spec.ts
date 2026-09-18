@@ -1,9 +1,10 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
 import { canonicalHash } from "../../src/protocol/canonical.js";
 import { storageKey } from "../../src/storage/workspace.js";
+import { snapshotWorkspace } from "../helpers/workspace-snapshot.js";
 
 const repositoryRoot = resolve(process.cwd());
 const readingPackagePath = resolve(repositoryRoot, "tests/runtime/fixtures/reading-golden/training-package.json");
@@ -66,6 +67,17 @@ test.describe.serial("Band8 browser dogfood", () => {
       buffer: Buffer.from("{not-json"),
     });
     await expect(page.getByRole("alert")).toContainText("INVALID_JSON_FILE");
+  });
+
+  test("browser navigation across every product projection is workspace read-only", async ({ page }) => {
+    const workspacePath = join(repositoryRoot, ".tmp", "phase1d-browser-dogfood");
+    rmSync(join(workspacePath, "settings", "product-selection.json"), { force: true });
+    const before = snapshotWorkspace(workspacePath);
+
+    await page.goto("/#today");
+    for (const route of ["TRAIN", "PROGRESS", "HISTORY", "COACH", "TODAY"] as const) await nav(page, route);
+
+    expect(snapshotWorkspace(workspacePath)).toEqual(before);
   });
 
   test("Reading runs through learner-safe HTTP payloads to reveal, Progress, and History", async ({ page }) => {

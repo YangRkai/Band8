@@ -58,6 +58,18 @@ export interface RuntimeOptions {
 
 export type InspectionStatus = "AUTHORITATIVE" | "VALID_INCOMPLETE" | "REBUILD_REQUIRED" | "QUARANTINED";
 
+interface SessionAssessment {
+  status: InspectionStatus;
+  session: SessionMetadata;
+  reconciliation: "NONE" | "CHECKPOINT_METADATA" | "QUARANTINE";
+  reason?: string;
+}
+
+interface ProductTarget {
+  session?: SessionMetadata;
+  unstarted?: ImportRecord;
+}
+
 export class UnsupportedRuntimePrimitiveError extends Error {
   constructor(type: string) {
     super(`UNSUPPORTED_RUNTIME_PRIMITIVE: ${type}`);
@@ -115,7 +127,7 @@ export class Band8Runtime {
       events: this.#events,
       store: reinforcementStore,
       learningTimezone: this.#learningTimezone,
-      inspectSession: (sessionId) => this.inspectSession(sessionId),
+      inspectSession: (sessionId) => this.#assessSession(sessionId),
     });
   }
 
@@ -311,11 +323,30 @@ export class Band8Runtime {
   }
 
   inspectSession(sessionId: string): { status: InspectionStatus; reason?: string } {
+    const assessment = this.#assessSession(sessionId);
+    if (assessment.reconciliation !== "NONE") this.#sessions.write(assessment.session);
+    return {
+      status: assessment.status,
+      ...(assessment.reason === undefined ? {} : { reason: assessment.reason }),
+    };
+  }
+
+  recoverCrashState(): void {
+    for (const session of this.#sessions.list()) {
+      const assessment = this.#assessSession(session.session_id);
+      if (assessment.reconciliation === "CHECKPOINT_METADATA") this.#sessions.write(assessment.session);
+    }
+  }
+
+  #assessSession(sessionId: string): SessionAssessment {
     const session = this.#sessions.read(sessionId);
     try {
       const packageDocument = this.#importer.loadPackage(session.package_id);
       let events: Document[];
       events = this.#events.read(sessionId);
+      if (["CREATED", "READY"].includes(session.state) && events.length === 0) {
+        return { status: "VALID_INCOMPLETE", session, reconciliation: "NONE" };
+      }
       const reconciliation = this.#artifacts.reconcile(sessionId, events);
       if (reconciliation.status === "INVALID") {
         throw new Error(`artifact reconciliation failed: ${reconciliation.invalid.map((issue) => issue.reason).join("; ")}`);
@@ -326,7 +357,7 @@ export class Band8Runtime {
         artifacts: this.#artifacts.metadataById(),
         artifactRoot: this.#artifacts.root,
       });
-      if (verdict.state === "VALID_INCOMPLETE") return { status: "VALID_INCOMPLETE" };
+      if (verdict.state === "VALID_INCOMPLETE") return { status: "VALID_INCOMPLETE", session, reconciliation: "NONE" };
       if (verdict.state === "AWAITING_COACH") {
         const checkpoint = this.#checkpoints.read(sessionId);
         this.#validator.validateCheckpoint(checkpoint, packageDocument);
@@ -334,7 +365,10 @@ export class Band8Runtime {
           throw new Error("checkpoint manifest evidence differs from terminal event");
         }
         if (session.state === "RUNNING") {
-          this.#sessions.write({
+          return {
+            status: "AUTHORITATIVE",
+            reconciliation: "CHECKPOINT_METADATA",
+            session: {
             ...session,
             state: "AWAITING_COACH",
             current_activity_index: packageDocument.activities.length,
@@ -342,24 +376,31 @@ export class Band8Runtime {
               .filter((event) => event.event_type === "activity_completed")
               .map((event) => event.activity_id as string),
             checkpoint_id: checkpoint.checkpoint_id,
-          });
+            },
+          };
         } else if (session.state !== "AWAITING_COACH") {
           throw new Error(`session metadata state ${session.state} contradicts checkpoint evidence`);
         }
-        return { status: "AUTHORITATIVE" };
+        return { status: "AUTHORITATIVE", session, reconciliation: "NONE" };
       }
       const result = this.#sessions.readResult(sessionId);
-      if (result === undefined) return { status: "REBUILD_REQUIRED" };
+      if (result === undefined) return { status: "REBUILD_REQUIRED", session, reconciliation: "NONE" };
       const protectedEvaluation = this.#importer.loadProtected(session.package_id);
       this.#validator.validateResult(result, events, packageDocument, protectedEvaluation, {
         artifacts: this.#artifacts.metadataById(),
         artifactRoot: this.#artifacts.root,
       });
-      return { status: "AUTHORITATIVE" };
+      return { status: "AUTHORITATIVE", session, reconciliation: "NONE" };
     } catch (error) {
       const reason = `event/result integrity failure: ${error instanceof Error ? error.message : String(error)}`;
-      this.#quarantine(session, reason);
-      return { status: "QUARANTINED", reason };
+      return {
+        status: "QUARANTINED",
+        reason,
+        reconciliation: session.state === "QUARANTINED" ? "NONE" : "QUARANTINE",
+        session: session.state === "QUARANTINED"
+          ? session
+          : { ...session, state: transitionState(session.state, "QUARANTINED"), quarantine_reason: reason },
+      };
     }
   }
 
@@ -410,8 +451,9 @@ export class Band8Runtime {
     const completed = this.#authoritativeCompletedSessions()
       .sort((left, right) => this.#sessionTimestamp(left).localeCompare(this.#sessionTimestamp(right)));
     const packages = this.#importer.list();
-    const session = this.#currentProductSession();
-    const unstarted = this.#latestUnstartedPackage();
+    const target = this.#resolveProductTarget();
+    const session = target.session;
+    const unstarted = target.unstarted;
     const projectUnstarted = unstarted !== undefined && (session === undefined || ["COMPLETED", "ABORTED", "QUARANTINED"].includes(session.state));
     const timezone = this.#learningTimezone.read();
     const latestCompleted = completed.at(-1);
@@ -429,7 +471,7 @@ export class Band8Runtime {
         this.#now(),
         timezone,
       ),
-      last_reveal: latestCompleted === undefined || timezone === undefined ? null : projectProductReveal(this.reveal(latestCompleted.session_id)),
+      last_reveal: latestCompleted === undefined || timezone === undefined ? null : projectProductReveal(projectReveal(this.#reinforcement.project(latestCompleted.session_id))),
       coach_status: this.#coachProductStatus(),
       primary_action: packages.length === 0
         ? "GO_TO_COACH"
@@ -438,8 +480,9 @@ export class Band8Runtime {
   }
 
   training(): TrainingProjection | null {
-    const session = this.#currentProductSession();
-    const unstarted = this.#latestUnstartedPackage();
+    const target = this.#resolveProductTarget();
+    const session = target.session;
+    const unstarted = target.unstarted;
     if (unstarted !== undefined && (session === undefined || ["COMPLETED", "ABORTED", "QUARANTINED"].includes(session.state))) {
       return {
         session_id: null,
@@ -453,16 +496,18 @@ export class Band8Runtime {
       };
     }
     if (session === undefined) return null;
-    const packageDocument = this.#importer.loadPackage(session.package_id);
+    const assessment = this.#assessSession(session.session_id);
+    const projectedSession = assessment.session;
+    const packageDocument = this.#importer.loadPackage(projectedSession.package_id);
     return {
-      session_id: session.session_id,
-      package_id: session.package_id,
-      state: session.state,
-      activity_number: Math.min(session.current_activity_index + 1, packageDocument.activities.length),
+      session_id: projectedSession.session_id,
+      package_id: projectedSession.package_id,
+      state: projectedSession.state,
+      activity_number: Math.min(projectedSession.current_activity_index + 1, packageDocument.activities.length),
       activity_count: packageDocument.activities.length,
-      mission: projectProductMission(this.mission(session.session_id)),
-      current_activity: session.state === "RUNNING" ? this.currentActivity(session.session_id) : null,
-      integrity: session.state === "QUARANTINED" ? { status: this.inspectSession(session.session_id).status } : { status: "OK" },
+      mission: projectProductMission(this.mission(projectedSession.session_id)),
+      current_activity: projectedSession.state === "RUNNING" ? this.currentActivity(projectedSession.session_id) : null,
+      integrity: assessment.status === "QUARANTINED" ? { status: "QUARANTINED" } : { status: "OK" },
     };
   }
 
@@ -470,10 +515,11 @@ export class Band8Runtime {
     let session: SessionMetadata;
     if (sessionId !== undefined) session = this.#sessions.read(sessionId);
     else {
-      const active = this.#currentProductSession();
+      const target = this.#resolveProductTarget();
+      const active = target.session;
       if (active !== undefined && !["COMPLETED", "ABORTED", "QUARANTINED"].includes(active.state)) session = active;
       else {
-        const selected = packageId ?? this.#latestUnstartedPackage()?.package_id;
+        const selected = packageId ?? target.unstarted?.package_id;
         if (selected === undefined) throw new Error("no training package is imported");
         session = this.createSession(selected, `session-${randomUUID()}`);
       }
@@ -510,15 +556,16 @@ export class Band8Runtime {
       training,
     };
     if (completion.state === "COMPLETED") {
-      payload.reinforcement = this.evaluateReinforcement(sessionId);
-      payload.reveal = projectProductReveal(this.reveal(sessionId));
+      const reinforcement = this.evaluateReinforcement(sessionId);
+      payload.reinforcement = reinforcement;
+      payload.reveal = projectProductReveal(projectReveal(reinforcement));
     }
     if (completion.state === "AWAITING_COACH") payload.coach = this.coachStatus();
     return payload;
   }
 
   coachStatus(): CoachProjection {
-    const sessions = this.#sessions.list();
+    const sessions = this.#sessions.list().map((session) => this.#assessSession(session.session_id).session);
     const continuation = sessions.find((session) => session.prior_session_id !== undefined && ["READY", "RUNNING"].includes(session.state));
     if (continuation !== undefined) return { status: "CONTINUATION_READY", session_id: continuation.session_id };
     const awaiting = sessions.find((session) => session.state === "AWAITING_COACH"
@@ -539,8 +586,9 @@ export class Band8Runtime {
 
   progress(): ProgressProjection {
     const completed = this.#authoritativeCompletedSessions();
-    const activeSession = this.#currentProductSession();
-    const activeUnstarted = this.#latestUnstartedPackage();
+    const target = this.#resolveProductTarget();
+    const activeSession = target.session;
+    const activeUnstarted = target.unstarted;
     const activePackage = activeUnstarted !== undefined
       ? this.#importer.loadPackage(activeUnstarted.package_id)
       : activeSession === undefined ? undefined : this.#importer.loadPackage(activeSession.package_id);
@@ -549,7 +597,7 @@ export class Band8Runtime {
     const latest = completed.sort((left, right) => this.#sessionTimestamp(left).localeCompare(this.#sessionTimestamp(right))).at(-1);
     const reinforcement = latest === undefined || this.#learningTimezone.read() === undefined
       ? undefined
-      : this.evaluateReinforcement(latest.session_id);
+      : this.#reinforcement.project(latest.session_id);
     return {
       goal: projectIeltsGoal(activePackage?.learner_goal ?? BAND8_IELTS_GOAL),
       missions: leaves.map((session) => projectProductMission(this.mission(session.session_id))),
@@ -573,8 +621,8 @@ export class Band8Runtime {
     const sessions = this.#sessions.list().sort((left, right) => this.#sessionTimestamp(right).localeCompare(this.#sessionTimestamp(left)));
     const page = sessions.slice(cursor, cursor + limit).map((session) => {
       const packageDocument = this.#importer.loadPackage(session.package_id);
-      const integrity = this.inspectSession(session.session_id);
-      const currentSession = this.#sessions.read(session.session_id);
+      const integrity = this.#assessSession(session.session_id);
+      const currentSession = integrity.session;
       if (integrity.status === "QUARANTINED") {
         return {
           session_id: session.session_id,
@@ -623,7 +671,9 @@ export class Band8Runtime {
         })),
         artifacts,
         corrections,
-        reveal: currentSession.state === "COMPLETED" && integrity.status === "AUTHORITATIVE" && this.#learningTimezone.read() !== undefined ? projectProductReveal(this.reveal(session.session_id)) : null,
+        reveal: currentSession.state === "COMPLETED" && integrity.status === "AUTHORITATIVE" && this.#learningTimezone.read() !== undefined
+          ? projectProductReveal(projectReveal(this.#reinforcement.project(session.session_id)))
+          : null,
         integrity: { status: integrity.status },
       };
     });
@@ -898,8 +948,8 @@ export class Band8Runtime {
     return this.coachStatus().status as CoachProductStatus;
   }
 
-  #currentProductSession(): SessionMetadata | undefined {
-    const sessions = this.#sessions.list();
+  #resolveProductTarget(): ProductTarget {
+    const sessions = this.#sessions.list().map((session) => this.#assessSession(session.session_id).session);
     const leaves = sessions.filter((candidate) => !sessions.some((item) => item.prior_session_id === candidate.session_id));
     const leafIds = new Set(leaves.map((session) => session.session_id));
     const runnableStates = new Set<SessionMetadata["state"]>(["CREATED", "READY", "RUNNING", "AWAITING_COACH", "SUSPENDED"]);
@@ -914,44 +964,25 @@ export class Band8Runtime {
       if (session.continuation_session_id !== undefined && this.#sessions.exists(session.continuation_session_id)) {
         const continuation = this.#sessions.read(session.continuation_session_id);
         if (leafIds.has(continuation.session_id) && runnableStates.has(continuation.state)) {
-          this.#productSelection.selectSession(continuation.session_id, continuation.run_id, this.#sessionTimestamp(continuation));
-          return continuation;
+          return { session: this.#assessSession(continuation.session_id).session };
         }
       }
-      if (leafIds.has(session.session_id) && runnableStates.has(session.state)) return session;
-      if (leafIds.has(session.session_id) && ["COMPLETED", "ABORTED"].includes(session.state) && unstarted.length === 0) return session;
+      const projected = this.#assessSession(session.session_id).session;
+      if (leafIds.has(projected.session_id) && runnableStates.has(projected.state)) return { session: projected };
+      if (leafIds.has(projected.session_id) && ["COMPLETED", "ABORTED"].includes(projected.state) && unstarted.length === 0) return { session: projected };
     }
     if (selected?.active_package_id !== null && selected?.active_package_id !== undefined) {
       const activePackage = unstarted.find((record) => record.package_id === selected.active_package_id);
-      if (activePackage !== undefined) return undefined;
+      if (activePackage !== undefined) return { unstarted: activePackage };
     }
     const runnable = deterministic(leaves.filter((session) => runnableStates.has(session.state)))[0];
-    if (runnable !== undefined) {
-      this.#productSelection.selectSession(runnable.session_id, runnable.run_id, this.#sessionTimestamp(runnable));
-      return runnable;
-    }
+    if (runnable !== undefined) return { session: runnable };
     const packageRecord = unstarted[0];
-    if (packageRecord !== undefined) {
-      const packageDocument = this.#importer.loadPackage(packageRecord.package_id);
-      this.#productSelection.selectPackage(packageRecord.package_id, String(packageDocument.run_id), packageRecord.imported_at);
-      return undefined;
-    }
+    if (packageRecord !== undefined) return { unstarted: packageRecord };
     const terminal = deterministic(leaves.filter((session) => ["COMPLETED", "ABORTED"].includes(session.state)))[0];
-    if (terminal !== undefined) {
-      this.#productSelection.selectSession(terminal.session_id, terminal.run_id, this.#sessionTimestamp(terminal));
-      return terminal;
-    }
-    this.#productSelection.clear("1970-01-01T00:00:00.000Z");
-    return deterministic(leaves.filter((session) => session.state === "QUARANTINED"))[0];
-  }
-
-  #latestUnstartedPackage(): ImportRecord | undefined {
-    const unstarted = this.#unstartedPackages();
-    const selected = this.#productSelection.read();
-    if (selected?.active_package_id !== null && selected?.active_package_id !== undefined) {
-      return unstarted.find((record) => record.package_id === selected.active_package_id);
-    }
-    return selected?.active_session_id === null || selected?.active_session_id === undefined ? unstarted[0] : undefined;
+    if (terminal !== undefined) return { session: terminal };
+    const quarantined = deterministic(leaves.filter((session) => session.state === "QUARANTINED"))[0];
+    return quarantined === undefined ? {} : { session: quarantined };
   }
 
   #unstartedPackages(): ImportRecord[] {
@@ -974,7 +1005,7 @@ export class Band8Runtime {
   #authoritativeCompletedSessions(): SessionMetadata[] {
     return this.#sessions.list()
       .filter((session) => session.state === "COMPLETED")
-      .filter((session) => this.inspectSession(session.session_id).status === "AUTHORITATIVE")
+      .filter((session) => this.#assessSession(session.session_id).status === "AUTHORITATIVE")
       .map((session) => this.#sessions.read(session.session_id));
   }
 
@@ -1036,8 +1067,4 @@ export class Band8Runtime {
     return result;
   }
 
-  #quarantine(session: SessionMetadata, reason: string): void {
-    if (session.state === "QUARANTINED") return;
-    this.#sessions.write({ ...session, state: transitionState(session.state, "QUARANTINED"), quarantine_reason: reason });
-  }
 }

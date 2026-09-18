@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { canonicalHash } from "../../src/protocol/canonical.js";
 import { Band8Runtime } from "../../src/runtime/runtime.js";
 import { storageKey } from "../../src/storage/workspace.js";
+import { snapshotWorkspace } from "../helpers/workspace-snapshot.js";
 
 type Document = Record<string, any>;
 
@@ -127,6 +128,14 @@ describe("real Runtime PATTERN_BROKEN chain", () => {
     expect(awarded.historicalDecision).toMatchObject({ decision_type: "historical_award", qualification: "confirmed" });
     const historical = awarded.historicalDecision;
     expect(readdirSync(join(path, "reinforcement", "decisions"))).toHaveLength(1);
+    const confirmedSnapshot = snapshotWorkspace(path);
+    runtime.today();
+    runtime.training();
+    runtime.progress();
+    runtime.history();
+    runtime.coachStatus();
+    runtime.workspaceInformation();
+    expect(snapshotWorkspace(path)).toEqual(confirmedSnapshot);
 
     runtime.rebuildResult(targetSession);
     runtime = Band8Runtime.open({ ...common, now: () => "2026-08-24T14:00:00Z" });
@@ -139,6 +148,14 @@ describe("real Runtime PATTERN_BROKEN chain", () => {
     expect(revoked.historicalDecision).toEqual(historical);
     expect(revoked.currentQualification).toMatchObject({ qualification: "revoked" });
     expect(readdirSync(join(path, "reinforcement", "decisions"))).toHaveLength(2);
+    const revokedSnapshot = snapshotWorkspace(path);
+    runtime.today();
+    runtime.training();
+    runtime.progress();
+    runtime.history();
+    runtime.coachStatus();
+    runtime.workspaceInformation();
+    expect(snapshotWorkspace(path)).toEqual(revokedSnapshot);
 
     runtime = Band8Runtime.open({ ...common, now: () => "2026-08-22T00:00:00Z" });
     expect(runtime.evaluateReinforcement(targetSession).currentQualification).toMatchObject({ qualification: "revoked" });

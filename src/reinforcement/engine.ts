@@ -2,7 +2,7 @@ import type { ProtocolValidator } from "../protocol/validator.js";
 import type { PackageImporter } from "../storage/package-importer.js";
 import type { ReinforcementStore } from "../storage/reinforcement-store.js";
 import type { LearningTimezoneStore } from "../storage/learning-timezone-store.js";
-import type { SessionStore } from "../storage/session-store.js";
+import type { SessionMetadata, SessionStore } from "../storage/session-store.js";
 import type { AppendOnlyEventStore } from "../storage/event-store.js";
 import { collectAuthoritativeEvidence } from "./evidence.js";
 import { projectMission } from "./mission.js";
@@ -24,13 +24,21 @@ interface ReinforcementEngineOptions {
   events: AppendOnlyEventStore;
   store: ReinforcementStore;
   learningTimezone: LearningTimezoneStore;
-  inspectSession: (sessionId: string) => { status: string };
+  inspectSession: (sessionId: string) => { status: string; session?: SessionMetadata };
 }
 
 export class ReinforcementEngine {
   constructor(private readonly options: ReinforcementEngineOptions) {}
 
   evaluate(sessionId: string): RuntimeReinforcementEvaluation {
+    return this.#evaluate(sessionId, true);
+  }
+
+  project(sessionId: string): RuntimeReinforcementEvaluation {
+    return this.#evaluate(sessionId, false);
+  }
+
+  #evaluate(sessionId: string, persist: boolean): RuntimeReinforcementEvaluation {
     const sources = this.#sources();
     const targetSource = sources.find((source) => source.session.session_id === sessionId);
     if (targetSource?.inspectionStatus !== "AUTHORITATIVE" || targetSource.session.state !== "COMPLETED") {
@@ -51,12 +59,14 @@ export class ReinforcementEngine {
     const evaluatedAt = Date.parse(now) < Date.parse(latestEvidenceAt) ? latestEvidenceAt : now;
     const timezone = this.options.learningTimezone.read();
     if (timezone === undefined) throw new Error("learning timezone is not configured");
-    const learningDays = evidence
-      .filter((session) => session.hasLegitimateParticipation && !session.clockAnomaly)
-      .map((session) => this.options.learningTimezone.assignLearningDay({
-        sessionId: session.sessionId,
-        completedAt: session.completedAt,
-      }));
+    const qualifyingEvidence = evidence.filter((session) => session.hasLegitimateParticipation && !session.clockAnomaly);
+    const qualifyingSessionIds = new Set(qualifyingEvidence.map((session) => session.sessionId));
+    const learningDays = persist
+      ? qualifyingEvidence.map((session) => this.options.learningTimezone.assignLearningDay({
+          sessionId: session.sessionId,
+          completedAt: session.completedAt,
+        }))
+      : this.options.learningTimezone.listLearningDays().filter((record) => qualifyingSessionIds.has(record.session_id));
     const currentQualification = historical === undefined
       ? undefined
       : this.options.store.readQualification(
@@ -75,15 +85,15 @@ export class ReinforcementEngine {
       ...(currentQualification === undefined ? {} : { existingCurrentQualification: currentQualification }),
     });
     const evidenceIds = new Set<string>(sources.flatMap((source) => source.events.map((event) => event.event_id as string)));
-    if (evaluation.historicalDecision !== undefined) {
+    if (persist && evaluation.historicalDecision !== undefined) {
       this.options.validator.validateReinforcementDecision(evaluation.historicalDecision, evidenceIds);
       this.options.store.publishDecision(evaluation.historicalDecision);
     }
-    if (evaluation.qualificationUpdate !== undefined) {
+    if (persist && evaluation.qualificationUpdate !== undefined) {
       this.options.validator.validateReinforcementDecision(evaluation.qualificationUpdate, evidenceIds);
       this.options.store.publishDecision(evaluation.qualificationUpdate);
     }
-    if (evaluation.currentQualification !== undefined) this.options.store.publishQualification(evaluation.currentQualification);
+    if (persist && evaluation.currentQualification !== undefined) this.options.store.publishQualification(evaluation.currentQualification);
     const packageDocument = targetSource.packageDocument;
     return {
       ...evaluation,
@@ -111,14 +121,16 @@ export class ReinforcementEngine {
   }
 
   #sources(): ReinforcementEvidenceSource[] {
-    return this.options.sessions.list().map((session) => {
+    return this.options.sessions.list().map((storedSession) => {
+      const inspection = this.options.inspectSession(storedSession.session_id);
+      const session = inspection.session ?? storedSession;
       const inspectionStatus = session.state === "COMPLETED"
-        ? this.options.inspectSession(session.session_id).status
+        ? inspection.status
         : session.state === "QUARANTINED" ? "QUARANTINED" : "VALID_INCOMPLETE";
       const result = this.options.sessions.readResult(session.session_id);
       return {
         inspectionStatus,
-        session: this.options.sessions.read(session.session_id),
+        session,
         packageDocument: this.options.importer.loadPackage(session.package_id),
         ...(result === undefined ? {} : { result }),
         events: this.options.events.read(session.session_id),

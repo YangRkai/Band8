@@ -248,6 +248,7 @@ export async function startBand8Server(options: StartBand8ServerOptions): Promis
     repositoryRoot: resolve(options.repositoryRoot),
     workspacePath: resolve(options.workspacePath),
   });
+  runtime.recoverCrashState();
   const staticRoot = resolve(options.staticRoot ?? join(options.repositoryRoot, "dist", "web"));
   const productApi = createProductApiHandlers(runtime);
   let expectedHost = "";
