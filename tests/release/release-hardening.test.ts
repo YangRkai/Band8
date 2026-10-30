@@ -21,6 +21,12 @@ function publicMarkdownFiles(): string[] {
   ];
 }
 
+function copyableCommandBlocks(markdown: string): string[] {
+  return [...markdown.matchAll(/```text\r?\n([\s\S]*?)\r?\n```/gu)]
+    .map((match) => match[1]!)
+    .filter((block) => /^(?:npm|python|node)\b/mu.test(block));
+}
+
 describe("open-source release contract", () => {
   it("uses one coherent alpha release identity and declared protocol dependency", () => {
     const packageMetadata = JSON.parse(readFileSync(resolve(repositoryRoot, "package.json"), "utf8"));
@@ -51,6 +57,18 @@ describe("open-source release contract", () => {
     ]) {
       expect(existsSync(resolve(repositoryRoot, path)), path).toBe(true);
     }
+  });
+
+  it("keeps Chinese as the default README with reciprocal language navigation and matching commands", () => {
+    const chinese = readFileSync(resolve(repositoryRoot, "README.md"), "utf8");
+    const english = readFileSync(resolve(repositoryRoot, "README.en.md"), "utf8");
+    const chineseLines = chinese.split(/\r?\n/u);
+    const englishLines = english.split(/\r?\n/u);
+
+    expect(chineseLines[0]).toBe("**简体中文** | [English](README.en.md)");
+    expect(englishLines[0]).toBe("[简体中文](README.md) | **English**");
+    expect(chineseLines.slice(1).join("\n")).toMatch(/\p{Script=Han}/u);
+    expect(copyableCommandBlocks(chinese)).toEqual(copyableCommandBlocks(english));
   });
 
   it("keeps Markdown links resolvable and public documentation portable", () => {
