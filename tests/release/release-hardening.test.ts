@@ -41,6 +41,7 @@ describe("open-source release contract", () => {
     for (const path of [
       "LICENSE",
       "README.md",
+      "README.en.md",
       "CONTRIBUTING.md",
       "SECURITY.md",
       "CHANGELOG.md",

@@ -1,58 +1,60 @@
+**简体中文** | [English](README.en.md)
+
 # Band8
 
-Band8 is a local-first IELTS training runtime that separates an external AI Coach from the software that executes training and records learning evidence.
+Band8 是一个本地优先的 IELTS 训练 Runtime。它将外部 AI Coach 与负责执行训练、记录学习证据的软件明确分离。
 
-`v0.1.0-alpha.1` is a source release candidate for developers and early local testing. It is not a complete IELTS product and does not estimate or guarantee an exam score.
+`v0.1.0-alpha.1` 是面向开发者和早期本地测试的源码发布候选版本。它不是完整的 IELTS 产品，也不会估算或保证考试分数。
 
-## Why Band8 exists
+## 为什么要做 Band8
 
-Personalized training needs two different kinds of authority:
+个性化训练需要区分两类不同的权威：
 
-- the external Coach diagnoses evidence and compiles personalized training;
-- the Runtime validates packages, executes sessions, persists artifacts, and records factual evidence;
-- reinforcement recognizes validated progress rather than time spent or repeated app use.
+- 外部 Coach 负责诊断证据并编制个性化训练；
+- Runtime 负责验证训练包、执行会话、持久化产物并记录事实证据；
+- 强化系统识别经过验证的进步，而不是奖励使用时长或重复打开应用。
 
-The Coach is not Runtime authority, and model inference is never stored as if it were a raw fact.
+Coach 不是 Runtime 的权威，模型推断也绝不会被当作原始事实存储。
 
-## Architecture
+## 架构
 
 ```text
-External AI Coach
+外部 AI Coach
        │
        │ B8TP
        ▼
 Band8 Runtime
        │
-       ├── Training sessions
-       ├── Evidence and artifacts
-       ├── Coach checkpoint exchange
-       ├── Reinforcement projections
-       └── Loopback Local Web Shell
+       ├── 训练会话
+       ├── 证据与产物
+       ├── Coach 检查点交换
+       ├── 强化投影
+       └── 仅限回环地址的本地 Web Shell
 ```
 
-Generated training packages are untrusted input. The Node.js Runtime owns validation, session state, protected evaluation, artifact identity, mission state, learning-day identity, and reinforcement decisions. The React browser shell renders learner-safe `/api/v1/` projections and sends user actions back to that authority.
+生成的训练包属于不可信输入。Node.js Runtime 掌握验证、会话状态、受保护评估、产物身份、任务状态、学习日身份和强化决策的权威。React 浏览器外壳只渲染面向学习者安全的 `/api/v1/` 投影，并把用户操作提交回 Runtime。
 
-Start with the [architecture overview](docs/architecture/BAND8_ARCHITECTURE.md) and [trust boundaries](docs/architecture/TRUST_BOUNDARIES.md).
+建议先阅读[架构概览](docs/architecture/BAND8_ARCHITECTURE.md)和[信任边界](docs/architecture/TRUST_BOUNDARIES.md)。
 
-## What works today
+## 当前可用能力
 
-`v0.1.0-alpha.1` includes:
+`v0.1.0-alpha.1` 包括：
 
-- B8TP 0.1 and the External Coach contract;
-- a Node.js/TypeScript Runtime with RFC 8785 canonical package identity;
-- append-only evidence, package idempotency, and crash/restart recovery;
-- protected objective evaluation for Reading `INSTRUCTION`, `PRESENT_TEXT`, and `SELECT` activities;
-- Writing `TEXT_RESPONSE`, authoritative artifact persistence, and checkpoint/continuation exchange;
-- portable, explicit Coach bundle export;
-- evidence-driven Mission, effective Streak, Retention, Transfer, and Pattern Broken projections;
-- IANA learning timezone settings with immutable timezone epochs;
-- a loopback React/Vite Web Shell with Today, Train, Progress, History, and Coach surfaces.
+- B8TP 0.1 和 External Coach 契约；
+- 基于 Node.js/TypeScript 的 Runtime，以及符合 RFC 8785 的规范化训练包身份；
+- 只追加证据、训练包幂等性，以及崩溃和重启恢复；
+- 面向 Reading 的受保护客观评估，支持 `INSTRUCTION`、`PRESENT_TEXT` 和 `SELECT` 活动；
+- Writing `TEXT_RESPONSE`、权威产物持久化，以及检查点/续包交换；
+- 可移植、显式触发的 Coach bundle 导出；
+- 由证据驱动的 Mission、有效 Streak、Retention、Transfer 和 Pattern Broken 投影；
+- 基于 IANA 时区和不可变 timezone epoch 的学习时区设置；
+- 仅绑定回环地址的 React/Vite Web Shell，包含 Today、Train、Progress、History 和 Coach 页面。
 
-Protocol navigation: [B8TP](protocol/B8TP.md), [Coach Contract](protocol/COACH_CONTRACT.md), [Pedagogy](protocol/PEDAGOGY.md), [Evidence Contract](protocol/EVIDENCE_CONTRACT.md), [Reinforcement Contract](protocol/REINFORCEMENT_CONTRACT.md), and [versioning](protocol/VERSIONING.md).
+协议入口：[B8TP](protocol/B8TP.md)、[Coach Contract](protocol/COACH_CONTRACT.md)、[Pedagogy](protocol/PEDAGOGY.md)、[Evidence Contract](protocol/EVIDENCE_CONTRACT.md)、[Reinforcement Contract](protocol/REINFORCEMENT_CONTRACT.md)和[版本策略](protocol/VERSIONING.md)。
 
-## Quick start
+## 快速开始
 
-Requirements: Node.js 20, npm 10, Python 3.11 or 3.12, and a Chromium-family browser for browser tests. CI uses Python 3.11; the local Linux clean-clone gate also covers Python 3.12.
+环境要求：Node.js 20、npm 10、Python 3.11 或 3.12；运行浏览器测试还需要 Chromium 系浏览器。CI 使用 Python 3.11，本地 Linux 全新克隆验证也覆盖 Python 3.12。
 
 ```text
 npm ci
@@ -61,7 +63,7 @@ npm run verify:release
 npm run test:e2e
 ```
 
-Build and start a local synthetic workspace:
+构建并启动一个本地合成 workspace：
 
 ```text
 npm run build
@@ -70,25 +72,25 @@ node dist/src/cli/index.js --workspace .tmp/band8-quickstart import tests/runtim
 node dist/src/cli/index.js --workspace .tmp/band8-quickstart serve
 ```
 
-The server binds only to `127.0.0.1`, selects a free port, and opens the local page. Use `--no-open` to suppress browser opening. See the tested [Quick Start](docs/QUICKSTART.md) for clean-clone setup and platform-specific Python environment commands.
+Server 只绑定 `127.0.0.1`，会自动选择可用端口并打开本地页面。使用 `--no-open` 可以禁止自动打开浏览器。全新克隆安装步骤和不同平台的 Python 环境命令见已经过测试的[快速开始指南](docs/QUICKSTART.md)。
 
-## External Coach workflow
+## External Coach 工作流
 
-Band8 does not call an automatic Coach service. A Writing checkpoint exports a data-only bundle through the Runtime. The user gives that bundle to an external Coach, then explicitly imports a continuation package. The Runtime validates package identity, checkpoint binding, evidence binding, and provenance before training resumes. See the [Writing Coach loop](docs/runtime/PHASE1B1_WRITING_COACH_LOOP.md).
+Band8 不会调用自动 Coach 服务。Writing 到达检查点后，由 Runtime 导出仅包含数据的 bundle。用户把该 bundle 交给外部 Coach，再显式导入 continuation package。恢复训练前，Runtime 会验证训练包身份、检查点绑定、证据绑定和来源。详见 [Writing Coach 闭环](docs/runtime/PHASE1B1_WRITING_COACH_LOOP.md)。
 
-## Evidence and reinforcement
+## 证据与强化
 
-Raw evidence is immutable factual history. Coach hypotheses remain labeled inference with confidence and evidence references. Reinforcement consumes Runtime evidence and can expose mission advancement, retention, transfer, pattern status, and effective learning days; it does not award XP for usage. See the [data flow](docs/architecture/DATA_FLOW.md) and [reinforcement design](docs/runtime/PHASE1C_REINFORCEMENT_ENGINE.md).
+原始证据是不可变的事实历史。Coach 假设始终标记为推断，并附带置信度和证据引用。强化系统消费 Runtime 证据，可以展示任务推进、保持、迁移、模式状态和有效学习日；它不会因为使用行为发放 XP。详见[数据流](docs/architecture/DATA_FLOW.md)和[强化系统设计](docs/runtime/PHASE1C_REINFORCEMENT_ENGINE.md)。
 
-## Current limitations
+## 当前限制
 
-This alpha does not include Speaking/audio, transcription, an automatic Codex or API Coach, calibrated IELTS score estimation, cloud sync, a native mobile app, Electron/Tauri packaging, a browser-only PWA Runtime, or official IELTS scoring.
+这个 alpha 版本不包含 Speaking/audio、语音转写、自动 Codex 或 API Coach、经过校准的 IELTS 分数估算、云同步、原生移动应用、Electron/Tauri 打包、纯浏览器 PWA Runtime，也不提供官方 IELTS 评分。
 
-## Privacy and security
+## 隐私与安全
 
-Runtime learning data stays in the user-selected local workspace unless the user explicitly exports a Coach bundle. Data is stored as JSON, NDJSON, and plain artifacts. The local server has no analytics or telemetry SaaS, does not fetch external assets, and is not designed for LAN or Internet exposure. It exposes no arbitrary shell, path-read, or URL-fetch API. See [SECURITY.md](SECURITY.md) and the [Phase 1D security model](docs/runtime/PHASE1D_LOCAL_WEB_SHELL.md).
+除非用户显式导出 Coach bundle，否则 Runtime 学习数据始终保留在用户选择的本地 workspace 中。数据以 JSON、NDJSON 和普通产物文件存储。本地 Server 不接入分析或遥测 SaaS，不获取外部资源，也不适合暴露到局域网或互联网。它不提供任意 shell、路径读取或 URL 获取 API。详见 [SECURITY.md](SECURITY.md) 和 [Phase 1D 安全模型](docs/runtime/PHASE1D_LOCAL_WEB_SHELL.md)。
 
-## Development
+## 开发
 
 ```text
 npm ci
@@ -97,14 +99,14 @@ npm run verify:release
 npm run test:e2e
 ```
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing Runtime boundaries or public fixtures. Content redistribution rules are in [docs/CONTENT_PROVENANCE.md](docs/CONTENT_PROVENANCE.md). Release history is in [CHANGELOG.md](CHANGELOG.md), with notes for this alpha in [docs/releases/v0.1.0-alpha.1.md](docs/releases/v0.1.0-alpha.1.md).
+修改 Runtime 边界或公开 fixture 前，请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。内容再分发规则见 [docs/CONTENT_PROVENANCE.md](docs/CONTENT_PROVENANCE.md)。发布历史见 [CHANGELOG.md](CHANGELOG.md)，当前 alpha 的发布说明见 [docs/releases/v0.1.0-alpha.1.md](docs/releases/v0.1.0-alpha.1.md)。
 
-## Roadmap
+## 路线图
 
-The next step after local review is public-release configuration and hosted CI evidence. Product capabilities deferred from this alpha remain deferred until their contracts and evidence boundaries are designed and validated.
+完成本地审查后的下一步，是配置公开发布和托管 CI 证据。这个 alpha 中暂缓的产品能力仍将保持暂缓，直到其契约和证据边界完成设计与验证。
 
-## License and trademark
+## 许可证与商标
 
-Band8 source is licensed under the [Apache License 2.0](LICENSE).
+Band8 源代码采用 [Apache License 2.0](LICENSE) 许可。
 
-Band8 is an independent open-source project and is not affiliated with, endorsed by, or sponsored by IELTS or its respective owners. IELTS is a trademark of its respective owners.
+Band8 是独立的开源项目，与 IELTS 及其相关权利方不存在隶属、认可或赞助关系。IELTS 是其各自权利方的商标。
