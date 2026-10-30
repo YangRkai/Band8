@@ -78,6 +78,7 @@ describe("open-source release contract", () => {
     expect(workflow).toContain("contents: read");
     expect(workflow).toMatch(/windows-latest/u);
     expect(workflow).toMatch(/ubuntu-latest/u);
+    expect(workflow).toMatch(/setup-python@v5[\s\S]*?cache:\s*pip[\s\S]*?cache-dependency-path:\s*requirements-protocol\.txt/u);
     expect(workflow).toContain("npm run verify:release");
     expect(workflow).toContain("npm run test:e2e");
     expect(workflow).toContain("playwright install --with-deps chromium");
